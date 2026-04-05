@@ -14,11 +14,17 @@ export default async function ClientDetailPage({
   const { id } = await params
   const supabase = await createClient()
 
-  const { data: client } = await supabase
-    .from("clients")
-    .select("*")
-    .eq("id", id)
-    .single()
+  let client = null
+  try {
+    const { data } = await supabase
+      .from("clients")
+      .select("*")
+      .eq("id", id)
+      .single()
+    client = data
+  } catch {
+    // Table may not exist
+  }
 
   if (!client) redirect("/admin")
 

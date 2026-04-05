@@ -8,24 +8,46 @@ export const dynamic = 'force-dynamic'
 export default async function AdminDashboard() {
   const supabase = await createClient()
 
-  const { data: clients } = await supabase
-    .from("clients")
-    .select("*")
-    .order("created_at", { ascending: false })
+  let allClients: Record<string, unknown>[] = []
+  let dbError: string | null = null
 
-  const allClients = clients || []
+  try {
+    const { data: clients, error } = await supabase
+      .from("clients")
+      .select("*")
+      .order("created_at", { ascending: false })
+
+    if (error) {
+      dbError = error.message
+    } else {
+      allClients = clients || []
+    }
+  } catch (err) {
+    dbError = err instanceof Error ? err.message : "Failed to load clients"
+  }
+
   const active = allClients.filter(
-    (c: { onboarding_completed: boolean }) => c.onboarding_completed
+    (c) => c.onboarding_completed === true
   )
   const pending = allClients.filter(
-    (c: { onboarding_completed: boolean; invite_accepted_at: string | null }) =>
-      !c.onboarding_completed && !c.invite_accepted_at
+    (c) => c.onboarding_completed !== true && !c.invite_accepted_at
   )
 
   return (
     <div className="max-w-4xl mx-auto">
       <h1 className="text-2xl font-bold mb-2">Dashboard</h1>
       <p className="text-gf-muted mb-8">Manage your clients</p>
+
+      {dbError && (
+        <Card className="mb-8">
+          <p className="text-sm text-yellow-400">
+            Database notice: {dbError}
+          </p>
+          <p className="text-xs text-gf-muted mt-1">
+            The clients table may need to be created. Check Supabase SQL editor.
+          </p>
+        </Card>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
@@ -59,7 +81,7 @@ export default async function AdminDashboard() {
       </div>
 
       {/* Client list with search/filter */}
-      <ClientList clients={allClients} />
+      <ClientList clients={allClients as any} />
     </div>
   )
 }
