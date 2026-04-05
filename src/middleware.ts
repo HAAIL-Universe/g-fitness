@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
 
-const publicPaths = ["/login", "/register", "/onboarding", "/admin/login", "/api/auth/callback", "/api/invite/accept"]
+const publicPaths = ["/login", "/register", "/onboarding", "/api/auth/callback", "/api/invite/accept"]
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
@@ -49,7 +49,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // Block non-admin from admin routes (role-based access control)
-  if (pathname.startsWith("/admin") && pathname !== "/admin/login") {
+  if (pathname.startsWith("/admin")) {
     const role = user.app_metadata?.role
     if (role !== "admin") {
       return NextResponse.redirect(new URL("/dashboard", request.url))
