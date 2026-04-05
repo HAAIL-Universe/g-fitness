@@ -32,22 +32,27 @@ export default function RegisterForm() {
     setLoading(true)
     setError("")
 
-    const supabase = createClient()
-    const { error: signUpError } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { full_name: name },
-      },
-    })
+    try {
+      const supabase = createClient()
+      const { error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: { full_name: name },
+        },
+      })
 
-    if (signUpError) {
-      setError(signUpError.message)
+      if (signUpError) {
+        setError(signUpError.message)
+        setLoading(false)
+        return
+      }
+
+      router.push("/login?registered=true")
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong")
       setLoading(false)
-      return
     }
-
-    router.push("/login?registered=true")
   }
 
   return (

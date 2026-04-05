@@ -24,26 +24,31 @@ export default function LoginForm() {
     setLoading(true)
     setError("")
 
-    const supabase = createClient()
-    const { error: authError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
+    try {
+      const supabase = createClient()
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
 
-    if (authError) {
-      setError(authError.message)
+      if (authError) {
+        setError(authError.message)
+        setLoading(false)
+        return
+      }
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      if (user?.email === process.env.NEXT_PUBLIC_ADMIN_EMAIL) {
+        router.push("/admin")
+      } else {
+        router.push(redirect)
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong")
       setLoading(false)
-      return
-    }
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (user?.email === process.env.NEXT_PUBLIC_ADMIN_EMAIL) {
-      router.push("/admin")
-    } else {
-      router.push(redirect)
     }
   }
 
