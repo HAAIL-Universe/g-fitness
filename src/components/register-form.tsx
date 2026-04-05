@@ -1,50 +1,53 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 
-export default function LoginForm() {
+export default function RegisterForm() {
   const router = useRouter()
-  const searchParams = useSearchParams()
-  const onboarded = searchParams?.get("onboarded")
-  const registered = searchParams?.get("registered")
-  const redirect = searchParams?.get("redirect") || "/dashboard"
 
+  const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
 
-  async function handleLogin(e: React.FormEvent) {
+  async function handleRegister(e: React.FormEvent) {
     e.preventDefault()
+
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters")
+      return
+    }
+    if (password !== confirmPassword) {
+      setError("Passwords don't match")
+      return
+    }
+
     setLoading(true)
     setError("")
 
     const supabase = createClient()
-    const { error: authError } = await supabase.auth.signInWithPassword({
+    const { error: signUpError } = await supabase.auth.signUp({
       email,
       password,
+      options: {
+        data: { full_name: name },
+      },
     })
 
-    if (authError) {
-      setError(authError.message)
+    if (signUpError) {
+      setError(signUpError.message)
       setLoading(false)
       return
     }
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (user?.email === process.env.NEXT_PUBLIC_ADMIN_EMAIL) {
-      router.push("/admin")
-    } else {
-      router.push(redirect)
-    }
+    router.push("/login?registered=true")
   }
 
   return (
@@ -54,21 +57,18 @@ export default function LoginForm() {
           <span className="text-gf-pink">G</span>-Fitness
         </h1>
         <p className="text-gf-muted text-center text-sm mb-8">
-          Log in to your account
+          Create your account
         </p>
 
-        {(onboarded || registered) && (
-          <div className="bg-green-900/20 border border-green-800 rounded-lg p-3 mb-6">
-            <p className="text-sm text-green-400 text-center">
-              {registered
-                ? "Account created! Check your email to confirm, then log in."
-                : "Account created! Log in to get started."}
-            </p>
-          </div>
-        )}
-
         <Card>
-          <form onSubmit={handleLogin} className="space-y-4">
+          <form onSubmit={handleRegister} className="space-y-4">
+            <Input
+              label="Full Name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Your full name"
+              required
+            />
             <Input
               label="Email"
               type="email"
@@ -82,22 +82,30 @@ export default function LoginForm() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Your password"
+              placeholder="At least 6 characters"
+              required
+            />
+            <Input
+              label="Confirm Password"
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="Type your password again"
               required
             />
 
             {error && <p className="text-sm text-red-400">{error}</p>}
 
             <Button type="submit" disabled={loading} className="w-full">
-              {loading ? "Logging in..." : "Log In"}
+              {loading ? "Creating account..." : "Sign Up"}
             </Button>
           </form>
         </Card>
 
         <p className="text-center text-sm text-gf-muted mt-6">
-          Don&apos;t have an account?{" "}
-          <a href="/register" className="text-gf-pink hover:underline">
-            Sign Up
+          Already have an account?{" "}
+          <a href="/login" className="text-gf-pink hover:underline">
+            Log In
           </a>
         </p>
       </div>
