@@ -1,6 +1,8 @@
 import { Resend } from "resend"
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+function getResend() {
+  return new Resend(process.env.RESEND_API_KEY)
+}
 
 export async function sendInviteEmail(
   to: string,
@@ -10,7 +12,7 @@ export async function sendInviteEmail(
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
   const inviteUrl = `${appUrl}/onboarding?token=${inviteToken}`
 
-  await resend.emails.send({
+  await getResend().emails.send({
     from: "G-Fitness <onboarding@resend.dev>",
     to,
     subject: "You've been invited to join G-Fitness",

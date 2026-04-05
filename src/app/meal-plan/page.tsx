@@ -1,8 +1,11 @@
 import { createClient } from "@/lib/supabase/server"
 import { getMealPlan } from "@/lib/google/sheets"
+import type { MealPlanDay } from "@/types"
 import { ClientNav } from "@/components/layout/client-nav"
 import { MealPlanView } from "@/components/meal-plan/meal-plan-view"
 import { redirect } from "next/navigation"
+
+export const dynamic = 'force-dynamic'
 
 export default async function MealPlanPage() {
   const supabase = await createClient()
@@ -18,7 +21,7 @@ export default async function MealPlanPage() {
     .eq("user_id", user.id)
     .single()
 
-  let mealPlan = []
+  let mealPlan: MealPlanDay[] = []
 
   if (client?.sheet_id) {
     try {

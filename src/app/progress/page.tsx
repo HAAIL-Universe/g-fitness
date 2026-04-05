@@ -1,9 +1,12 @@
 import { createClient } from "@/lib/supabase/server"
 import { getProgress } from "@/lib/google/sheets"
+import type { ProgressEntry } from "@/types"
 import { ClientNav } from "@/components/layout/client-nav"
 import { ProgressForm } from "@/components/progress/progress-form"
 import { ProgressChart, ProgressHistory } from "@/components/progress/progress-chart"
 import { redirect } from "next/navigation"
+
+export const dynamic = 'force-dynamic'
 
 export default async function ProgressPage() {
   const supabase = await createClient()
@@ -19,7 +22,7 @@ export default async function ProgressPage() {
     .eq("user_id", user.id)
     .single()
 
-  let progress = []
+  let progress: ProgressEntry[] = []
 
   if (client?.sheet_id) {
     try {

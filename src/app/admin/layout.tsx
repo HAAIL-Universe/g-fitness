@@ -1,5 +1,7 @@
 import { AdminNav } from "@/components/layout/admin-nav"
 
+export const dynamic = 'force-dynamic'
+
 export default function AdminLayout({
   children,
 }: {

@@ -148,7 +148,7 @@ export function OnboardingForm({ token, email }: Props) {
               label="Height"
               value={data.height}
               onChange={(e) => update("height", e.target.value)}
-              placeholder='e.g. 5\'10" or 178cm'
+              placeholder={"e.g. 5'10\" or 178cm"}
             />
             <Input
               label="Current Weight"

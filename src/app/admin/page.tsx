@@ -4,6 +4,8 @@ import { Badge } from "@/components/ui/badge"
 import Link from "next/link"
 import { Users, UserPlus, CheckCircle, Clock } from "lucide-react"
 
+export const dynamic = 'force-dynamic'
+
 export default async function AdminDashboard() {
   const supabase = createAdmin()
 

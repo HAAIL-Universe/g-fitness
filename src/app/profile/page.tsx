@@ -4,6 +4,8 @@ import { ClientNav } from "@/components/layout/client-nav"
 import { Card } from "@/components/ui/card"
 import { redirect } from "next/navigation"
 
+export const dynamic = 'force-dynamic'
+
 export default async function ProfilePage() {
   const supabase = await createClient()
   const {

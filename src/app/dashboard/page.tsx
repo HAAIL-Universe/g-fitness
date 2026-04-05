@@ -1,10 +1,13 @@
 import { createClient } from "@/lib/supabase/server"
 import { getMealPlan, getProgress } from "@/lib/google/sheets"
+import type { MealPlanDay, ProgressEntry } from "@/types"
 import { ClientNav } from "@/components/layout/client-nav"
 import { TodaysMeals } from "@/components/meal-plan/meal-plan-view"
 import { ProgressForm } from "@/components/progress/progress-form"
 import { Card } from "@/components/ui/card"
 import { redirect } from "next/navigation"
+
+export const dynamic = 'force-dynamic'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -20,8 +23,8 @@ export default async function DashboardPage() {
     .eq("user_id", user.id)
     .single()
 
-  let mealPlan = []
-  let progress = []
+  let mealPlan: MealPlanDay[] = []
+  let progress: ProgressEntry[] = []
 
   if (client?.sheet_id) {
     try {
