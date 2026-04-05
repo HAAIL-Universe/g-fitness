@@ -37,8 +37,9 @@ export default function LoginForm() {
         return
       }
 
-      // Redirect admins to admin dashboard
-      if (data.user?.app_metadata?.role === "admin") {
+      // Redirect admin email to admin dashboard
+      const adminEmails = ["kris.deane93@gmail.com"]
+      if (data.user?.email && adminEmails.includes(data.user.email.toLowerCase())) {
         router.push("/admin")
       } else {
         router.push(redirect)

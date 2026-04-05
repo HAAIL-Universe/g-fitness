@@ -48,10 +48,13 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl)
   }
 
-  // Block non-admin from admin routes (role-based access control)
+  // Block non-admin from admin routes
   if (pathname.startsWith("/admin")) {
-    const role = user.app_metadata?.role
-    if (role !== "admin") {
+    const adminEmails = ["kris.deane93@gmail.com"]
+    const isAdmin =
+      user.app_metadata?.role === "admin" ||
+      (user.email && adminEmails.includes(user.email.toLowerCase()))
+    if (!isAdmin) {
       return NextResponse.redirect(new URL("/dashboard", request.url))
     }
   }
