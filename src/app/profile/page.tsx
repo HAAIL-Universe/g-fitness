@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server"
 import { getProfile } from "@/lib/google/sheets"
 import { ClientNav } from "@/components/layout/client-nav"
 import { Card } from "@/components/ui/card"
+import { LogoutButton } from "@/components/logout-button"
 import { redirect } from "next/navigation"
 
 export const dynamic = 'force-dynamic'
@@ -76,6 +77,8 @@ export default async function ProfilePage() {
               <p className="text-gf-muted">Profile data not available yet</p>
             </Card>
           )}
+
+          <LogoutButton />
         </div>
       </main>
     </div>

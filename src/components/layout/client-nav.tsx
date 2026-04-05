@@ -82,6 +82,13 @@ export function ClientNav() {
               {label}
             </Link>
           ))}
+          <button
+            onClick={handleLogout}
+            className="flex flex-col items-center gap-1 px-3 py-1.5 text-xs text-gf-muted transition-colors"
+          >
+            <LogOut size={20} />
+            Log out
+          </button>
         </div>
       </nav>
     </>
