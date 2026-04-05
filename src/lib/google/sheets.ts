@@ -2,6 +2,23 @@ import { google } from "googleapis"
 import { getAuthedClient } from "./auth"
 import type { MealPlanDay, ProgressEntry, ProfileData } from "@/types"
 
+export async function updateMealPlan(
+  sheetId: string,
+  mealPlan: MealPlanDay[]
+): Promise<void> {
+  const sheets = await getSheetsApi()
+  const values = [
+    ["Day", "Breakfast", "Lunch", "Dinner", "Snacks"],
+    ...mealPlan.map((day) => [day.day, day.breakfast, day.lunch, day.dinner, day.snacks]),
+  ]
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: sheetId,
+    range: `Meal Plan!A1:E${values.length}`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values },
+  })
+}
+
 async function getSheetsApi() {
   const auth = await getAuthedClient()
   return google.sheets({ version: "v4", auth })

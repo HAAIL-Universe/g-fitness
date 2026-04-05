@@ -5,5 +5,5 @@ export async function isAdmin(): Promise<boolean> {
   const {
     data: { user },
   } = await supabase.auth.getUser()
-  return user?.email === process.env.ADMIN_EMAIL
+  return user?.app_metadata?.role === "admin"
 }

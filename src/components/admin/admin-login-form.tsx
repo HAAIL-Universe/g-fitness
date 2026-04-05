@@ -1,18 +1,14 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 
-export default function LoginForm() {
+export default function AdminLoginPage() {
   const router = useRouter()
-  const searchParams = useSearchParams()
-  const onboarded = searchParams?.get("onboarded")
-  const registered = searchParams?.get("registered")
-  const redirect = searchParams?.get("redirect") || "/dashboard"
 
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -26,7 +22,7 @@ export default function LoginForm() {
 
     try {
       const supabase = createClient()
-      const { error: authError } = await supabase.auth.signInWithPassword({
+      const { data, error: authError } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
@@ -37,7 +33,16 @@ export default function LoginForm() {
         return
       }
 
-      router.push(redirect)
+      // Verify user has admin role
+      const role = data.user?.app_metadata?.role
+      if (role !== "admin") {
+        await supabase.auth.signOut()
+        setError("Access denied. This login is for administrators only.")
+        setLoading(false)
+        return
+      }
+
+      router.push("/admin")
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong")
       setLoading(false)
@@ -51,18 +56,8 @@ export default function LoginForm() {
           <span className="text-gf-pink">G</span>-Fitness
         </h1>
         <p className="text-gf-muted text-center text-sm mb-8">
-          Log in to your account
+          Admin Panel
         </p>
-
-        {(onboarded || registered) && (
-          <div className="bg-green-900/20 border border-green-800 rounded-lg p-3 mb-6">
-            <p className="text-sm text-green-400 text-center">
-              {registered
-                ? "Account created! Check your email to confirm, then log in."
-                : "Account created! Log in to get started."}
-            </p>
-          </div>
-        )}
 
         <Card>
           <form onSubmit={handleLogin} className="space-y-4">
@@ -71,7 +66,7 @@ export default function LoginForm() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
+              placeholder="admin@example.com"
               required
             />
             <Input
@@ -86,15 +81,14 @@ export default function LoginForm() {
             {error && <p className="text-sm text-red-400">{error}</p>}
 
             <Button type="submit" disabled={loading} className="w-full">
-              {loading ? "Logging in..." : "Log In"}
+              {loading ? "Signing in..." : "Sign In"}
             </Button>
           </form>
         </Card>
 
         <p className="text-center text-sm text-gf-muted mt-6">
-          Don&apos;t have an account?{" "}
-          <a href="/register" className="text-gf-pink hover:underline">
-            Sign Up
+          <a href="/login" className="text-gf-pink hover:underline">
+            Client login
           </a>
         </p>
       </div>

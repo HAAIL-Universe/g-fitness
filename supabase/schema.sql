@@ -40,8 +40,38 @@ create policy "admin_own_settings" on admin_settings
 create policy "clients_read_own" on clients
   for select using (auth.uid() = user_id);
 
--- Admin full access to clients (service role used in API routes)
--- No RLS policy needed — API routes use service role key for admin operations
+-- Admin full access to clients via role-based access control
+create policy "admin_full_access" on clients
+  for all using (
+    (auth.jwt() -> 'app_metadata' ->> 'role') = 'admin'
+  );
+
+-- User roles table (source of truth for RBAC)
+create table user_roles (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id) on delete cascade unique,
+  role text not null default 'client' check (role in ('admin', 'client')),
+  created_at timestamptz default now()
+);
+
+alter table user_roles enable row level security;
+
+-- Only service role can manage roles (no RLS policy = no access via anon/authenticated keys)
+
+-- Trigger: sync role into auth.users.raw_app_meta_data on insert/update
+create or replace function sync_role_to_app_metadata()
+returns trigger as $$
+begin
+  update auth.users
+  set raw_app_meta_data = raw_app_meta_data || jsonb_build_object('role', NEW.role)
+  where id = NEW.user_id;
+  return NEW;
+end;
+$$ language plpgsql security definer;
+
+create trigger on_role_change
+  after insert or update on user_roles
+  for each row execute function sync_role_to_app_metadata();
 
 -- Indexes
 create index idx_clients_email on clients(email);
