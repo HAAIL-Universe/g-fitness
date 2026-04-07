@@ -63,6 +63,30 @@ export async function sendAppointmentRequestEmail(
   })
 }
 
+export async function sendAppointmentDeclinedEmail(
+  clientEmail: string,
+  clientName: string,
+  coachNote: string
+) {
+  await getResend().emails.send({
+    from: `${PLATFORM_NAME} <notifications@resend.dev>`,
+    to: clientEmail,
+    subject: "Your session request",
+    html: `
+      <div style="font-family: system-ui, sans-serif; max-width: 480px; margin: 0 auto; background: #0a0a0a; color: #ffffff; padding: 40px; border-radius: 12px;">
+        <h1 style="color: #ff2d8a; font-size: 24px; margin: 0 0 24px 0;">${PLATFORM_NAME}</h1>
+        <p style="font-size: 16px; line-height: 1.6; margin: 0 0 16px 0;">
+          Hi ${clientName}, unfortunately we're unable to confirm your session request at this time.
+        </p>
+        ${coachNote ? `<p style="font-size: 15px; color: #cccccc; background: #1a1a1a; padding: 16px; border-radius: 8px; margin: 0 0 24px 0;">"${coachNote}"</p>` : ""}
+        <p style="font-size: 13px; color: #888888; margin: 24px 0 0 0;">
+          Please reach out to your coach directly if you have any questions.
+        </p>
+      </div>
+    `,
+  })
+}
+
 export async function sendAppointmentConfirmedEmail(
   clientEmail: string,
   clientName: string,

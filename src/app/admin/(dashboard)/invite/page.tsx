@@ -1,10 +1,12 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Card, CardTitle } from "@/components/ui/card"
-import { Send, CheckCircle } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { Send, CheckCircle, Clock } from "lucide-react"
+import type { Client } from "@/types"
 
 export default function InvitePage() {
   const [name, setName] = useState("")
@@ -12,6 +14,19 @@ export default function InvitePage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
+  const [pending, setPending] = useState<Client[]>([])
+
+  const loadPending = useCallback(async () => {
+    try {
+      const data = await fetch("/api/admin/clients").then((r) => r.json())
+      const clients: Client[] = data.clients ?? []
+      setPending(clients.filter((c) => !c.onboarding_completed && c.invite_token))
+    } catch {
+      // ignore
+    }
+  }, [])
+
+  useEffect(() => { loadPending() }, [loadPending])
 
   async function handleInvite(e: React.FormEvent) {
     e.preventDefault()
@@ -36,12 +51,35 @@ export default function InvitePage() {
       setSuccess(`Invite sent to ${email}`)
       setName("")
       setEmail("")
+      loadPending()
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong")
     } finally {
       setLoading(false)
     }
   }
+
+  async function resend(clientName: string, clientEmail: string) {
+    setError("")
+    setSuccess("")
+    try {
+      const res = await fetch("/api/invite/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: clientName, email: clientEmail }),
+      })
+      if (!res.ok) {
+        const body = await res.json()
+        throw new Error(body.error || "Failed to resend invite")
+      }
+      setSuccess(`Invite resent to ${clientEmail}`)
+      loadPending()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong")
+    }
+  }
+
+  const now = new Date()
 
   return (
     <div className="max-w-lg mx-auto">
@@ -50,7 +88,7 @@ export default function InvitePage() {
         Send an onboarding invite to a new client
       </p>
 
-      <Card>
+      <Card className="mb-8">
         <CardTitle>New Invitation</CardTitle>
         <form onSubmit={handleInvite} className="space-y-4 mt-4">
           <Input
@@ -85,7 +123,52 @@ export default function InvitePage() {
         </form>
       </Card>
 
-      <p className="text-xs text-gf-muted text-center mt-6">
+      <div>
+        <h2 className="text-lg font-semibold mb-3">Pending Invitations</h2>
+        {pending.length === 0 ? (
+          <p className="text-gf-muted text-sm">No pending invitations.</p>
+        ) : (
+          <div className="space-y-3">
+            {pending.map((c) => {
+              const expired = c.invite_expires_at ? new Date(c.invite_expires_at) < now : false
+              return (
+                <Card key={c.id}>
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="space-y-1">
+                      <p className="font-medium">{c.name}</p>
+                      <p className="text-xs text-gf-muted">{c.email}</p>
+                      {c.invite_expires_at && (
+                        <p className="text-xs text-gf-muted flex items-center gap-1">
+                          <Clock size={11} />
+                          {expired
+                            ? "Expired"
+                            : `Expires ${new Date(c.invite_expires_at).toLocaleDateString("en-GB")}`}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {expired ? (
+                        <Badge variant="default">Expired</Badge>
+                      ) : (
+                        <Badge variant="warning">Pending</Badge>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => resend(c.name, c.email)}
+                      >
+                        Resend
+                      </Button>
+                    </div>
+                  </div>
+                </Card>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      <p className="text-xs text-gf-muted text-center mt-8">
         The client will receive an email with a link to complete their
         onboarding questionnaire and create their account. The link expires
         after 7 days.

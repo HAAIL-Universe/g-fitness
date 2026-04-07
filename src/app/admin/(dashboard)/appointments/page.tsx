@@ -59,10 +59,42 @@ function ConfirmForm({ id, onDone }: { id: string; onDone: () => void }) {
         <Button onClick={submit} disabled={loading || !confirmedAt} className="text-sm py-1.5 px-4">
           {loading ? "Confirming..." : "Confirm"}
         </Button>
-        <button
-          onClick={onDone}
-          className="text-sm text-gf-muted hover:text-white px-4"
-        >
+        <button onClick={onDone} className="text-sm text-gf-muted hover:text-white px-4">
+          Cancel
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function DeclineForm({ id, onDone }: { id: string; onDone: () => void }) {
+  const [note, setNote] = useState("")
+  const [loading, setLoading] = useState(false)
+
+  async function submit() {
+    setLoading(true)
+    await fetch(`/api/admin/appointments/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "declined", coach_note: note }),
+    })
+    onDone()
+  }
+
+  return (
+    <div className="mt-3 space-y-2 border-t border-gf-border pt-3">
+      <textarea
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        placeholder="Reason for declining (optional, sent to client)"
+        rows={2}
+        className="w-full bg-gf-surface border border-gf-border rounded-lg px-3 py-2 text-sm text-white placeholder-gf-muted focus:outline-none focus:border-gf-pink resize-none"
+      />
+      <div className="flex gap-2">
+        <Button onClick={submit} disabled={loading} variant="secondary" className="text-sm py-1.5 px-4">
+          {loading ? "Declining..." : "Decline"}
+        </Button>
+        <button onClick={onDone} className="text-sm text-gf-muted hover:text-white px-4">
           Cancel
         </button>
       </div>
@@ -73,23 +105,16 @@ function ConfirmForm({ id, onDone }: { id: string; onDone: () => void }) {
 export default function AdminAppointmentsPage() {
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [confirming, setConfirming] = useState<string | null>(null)
+  const [declining, setDeclining] = useState<string | null>(null)
 
   async function load() {
     const data = await fetch("/api/admin/appointments").then((r) => r.json())
     setAppointments(data.appointments ?? [])
     setConfirming(null)
+    setDeclining(null)
   }
 
   useEffect(() => { load() }, [])
-
-  async function decline(id: string) {
-    await fetch(`/api/admin/appointments/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: "declined" }),
-    })
-    load()
-  }
 
   const pending = appointments.filter((a) => a.status === "pending")
   const confirmed = appointments.filter((a) => a.status === "confirmed")
@@ -120,16 +145,18 @@ export default function AdminAppointmentsPage() {
                 </div>
                 {confirming === a.id ? (
                   <ConfirmForm id={a.id} onDone={load} />
+                ) : declining === a.id ? (
+                  <DeclineForm id={a.id} onDone={load} />
                 ) : (
                   <div className="flex gap-2 mt-3 pt-3 border-t border-gf-border">
                     <Button
-                      onClick={() => setConfirming(a.id)}
+                      onClick={() => { setConfirming(a.id); setDeclining(null) }}
                       className="text-sm py-1.5 px-4"
                     >
                       Confirm
                     </Button>
                     <button
-                      onClick={() => decline(a.id)}
+                      onClick={() => { setDeclining(a.id); setConfirming(null) }}
                       className="text-sm text-gf-muted hover:text-white px-4"
                     >
                       Decline

@@ -4,6 +4,8 @@ import { redirect } from "next/navigation"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { BillingActions } from "@/components/admin/billing-actions"
+import { getStripe } from "@/lib/stripe"
+import Stripe from "stripe"
 
 export const dynamic = "force-dynamic"
 
@@ -31,6 +33,19 @@ function statusBadge(status: string | null) {
   }
 }
 
+async function getPlanName(subscriptionId: string | null): Promise<string> {
+  if (!subscriptionId) return "Coach Monthly"
+  try {
+    const subscription = await getStripe().subscriptions.retrieve(subscriptionId, {
+      expand: ["items.data.price.product"],
+    })
+    const product = subscription.items.data[0]?.price?.product as Stripe.Product | undefined
+    return product?.name ?? "Coach Monthly"
+  } catch {
+    return "Coach Monthly"
+  }
+}
+
 export default async function BillingPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -39,13 +54,14 @@ export default async function BillingPage() {
   const admin = createAdmin()
   const { data: role } = await admin
     .from("user_roles")
-    .select("stripe_subscription_status, trial_ends_at, subscription_ends_at")
+    .select("stripe_subscription_status, stripe_subscription_id, trial_ends_at, subscription_ends_at")
     .eq("user_id", user.id)
     .single()
 
   const status = role?.stripe_subscription_status ?? "trialing"
   const trialEnds = role?.trial_ends_at ?? null
   const subEnds = role?.subscription_ends_at ?? null
+  const planName = await getPlanName(role?.stripe_subscription_id ?? null)
 
   return (
     <div className="p-8 max-w-xl">
@@ -55,7 +71,7 @@ export default async function BillingPage() {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <span className="text-gf-muted text-sm">Plan</span>
-            <span className="font-medium">Coach Monthly</span>
+            <span className="font-medium">{planName}</span>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-gf-muted text-sm">Status</span>

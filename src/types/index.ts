@@ -31,6 +31,8 @@ export interface AdminSettings {
   google_refresh_token: string | null
   google_access_token: string | null
   google_token_expiry: string | null
+  display_name: string | null
+  business_name: string | null
   created_at: string
   updated_at: string
 }

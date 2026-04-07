@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { verifyCoach, isCoachResult } from "@/lib/auth-helpers"
-import { sendAppointmentConfirmedEmail } from "@/lib/resend"
+import { sendAppointmentConfirmedEmail, sendAppointmentDeclinedEmail } from "@/lib/resend"
 
 export async function PATCH(
   request: NextRequest,
@@ -37,13 +37,24 @@ export async function PATCH(
     return NextResponse.json({ error: "Failed to update appointment" }, { status: 500 })
   }
 
-  // Email client on confirmation
   if (status === "confirmed" && confirmed_at && appointment.clients) {
     try {
       await sendAppointmentConfirmedEmail(
         appointment.clients.email,
         appointment.clients.name || "there",
         confirmed_at,
+        coach_note || ""
+      )
+    } catch {
+      // Email failure is non-fatal
+    }
+  }
+
+  if (status === "declined" && appointment.clients) {
+    try {
+      await sendAppointmentDeclinedEmail(
+        appointment.clients.email,
+        appointment.clients.name || "there",
         coach_note || ""
       )
     } catch {

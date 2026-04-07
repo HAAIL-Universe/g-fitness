@@ -420,14 +420,14 @@ No existing platform offers native two-way Google Sheets integration as a first-
 
 ## Build Phases
 
-### Phase 1 — Nutritionist MVP (pitch-worthy for warm leads)
+### Phase 1 — Nutritionist MVP (pitch-worthy for warm leads) — In Progress
 > Target: ~15–20 hours. Unlocks the 8 frozen cold email targets.
 
-- [ ] Multi-coach sign-up (remove hardcoded single-admin architecture)
-- [ ] Google Sheets connection in admin settings (each coach connects their own Google account)
-- [ ] Basic appointment booking (Google Calendar sync)
-- [ ] Stripe payment integration (subscription + per-session)
-- [ ] Improved meal plan builder
+- [x] Multi-coach sign-up (remove hardcoded single-admin architecture)
+- [x] Google Sheets connection in admin settings (each coach connects their own Google account)
+- [ ] Basic appointment booking (Google Calendar sync) — app-side booking complete (request/confirm/decline + email notifications); Google Calendar sync not yet built
+- [ ] Stripe payment integration (subscription + per-session) — recurring subscription billing complete (trial + monthly + webhooks); per-session billing not yet built
+- [x] Improved meal plan builder
 - [ ] Rebrand away from G-Fitness (new name, new landing page leading with Sheets differentiator)
 
 ### Phase 2 — PT Module
@@ -497,3 +497,5 @@ No existing platform offers native two-way Google Sheets integration as a first-
 | 2026-04-07 | 8 cold email targets (PTs, nutritionists, sports coaches) frozen pending Phase 1 completion. |
 | 2026-04-07 | Workout builder deferred to Phase 2 — too large for initial pitch window. |
 | 2026-04-07 | Mindbody/Glofox contract exodus noted as acquisition opportunity for studio owners. |
+| 2026-04-07 | Phase 1 partially complete. Multi-coach, Sheets connection, and meal plan builder done. Remaining: Google Calendar sync, per-session billing, rebrand. |
+| 2026-04-07 | Google Calendar sync and per-session billing deprioritised within Phase 1 — appointment booking works without calendar sync, and subscription billing is sufficient for initial pitches. Decision: assess whether these are needed before cold outreach or can slip to Phase 2. |
