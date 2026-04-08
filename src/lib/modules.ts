@@ -9,6 +9,15 @@ export const COACH_TYPE_PRESETS = [
 
 export type CoachTypePreset = (typeof COACH_TYPE_PRESETS)[number]
 
+export const COACH_TYPE_LABELS: Record<CoachTypePreset, string> = {
+  personal_trainer: "Personal trainer",
+  nutritionist: "Nutritionist",
+  wellness_coach: "Wellness coach",
+  sports_performance_coach: "Sports performance coach",
+  yoga_pilates_instructor: "Yoga / Pilates instructor",
+  gym_studio_owner: "Gym / studio owner",
+}
+
 export const ENABLEABLE_MODULES = ["pt_core", "nutrition_core"] as const
 
 export type EnableableModule = (typeof ENABLEABLE_MODULES)[number]

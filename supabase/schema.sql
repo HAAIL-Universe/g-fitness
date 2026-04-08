@@ -26,6 +26,10 @@ create table admin_settings (
       'gym_studio_owner'
     )),
   active_modules text[],
+  managed_workspace_sheet_id text,
+  managed_workspace_sheet_url text,
+  managed_workspace_sheet_modules text[],
+  managed_workspace_sheet_provisioned_at timestamptz,
   appointment_booking_mode text default 'coach_only',
   created_at timestamptz default now(),
   updated_at timestamptz default now()

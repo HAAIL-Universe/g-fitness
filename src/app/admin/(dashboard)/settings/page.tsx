@@ -15,7 +15,10 @@ import { DeleteAccountCard } from "@/components/account/delete-account-card"
 export default function SettingsPage() {
   const searchParams = useSearchParams()
   const [connected, setConnected] = useState<boolean | null>(null)
+  const [sheetsProvisioned, setSheetsProvisioned] = useState(false)
+  const [managedWorkspaceSheetUrl, setManagedWorkspaceSheetUrl] = useState("")
   const [disconnecting, setDisconnecting] = useState(false)
+  const [provisioning, setProvisioning] = useState(false)
   const [connectionMessage, setConnectionMessage] = useState("")
   const [connectionError, setConnectionError] = useState("")
 
@@ -85,8 +88,16 @@ export default function SettingsPage() {
   function checkConnection() {
     fetch("/api/google/connect")
       .then((res) => res.json())
-      .then((data) => setConnected(data.connected))
-      .catch(() => setConnected(false))
+      .then((data) => {
+        setConnected(data.connected)
+        setSheetsProvisioned(Boolean(data.sheets_provisioned))
+        setManagedWorkspaceSheetUrl(data.managed_workspace_sheet_url ?? "")
+      })
+      .catch(() => {
+        setConnected(false)
+        setSheetsProvisioned(false)
+        setManagedWorkspaceSheetUrl("")
+      })
   }
 
   function fetchProfile() {
@@ -160,6 +171,35 @@ export default function SettingsPage() {
       // ignore
     } finally {
       setDisconnecting(false)
+    }
+  }
+
+  async function handleCreateChameleonSheets() {
+    setProvisioning(true)
+    setConnectionError("")
+    setConnectionMessage("")
+
+    try {
+      const response = await fetch("/api/google/provision", { method: "POST" })
+      const data = await response.json()
+
+      if (!response.ok) {
+        setConnectionError(data.error || "Failed to create Chameleon Sheets.")
+        return
+      }
+
+      setSheetsProvisioned(true)
+      setManagedWorkspaceSheetUrl(data.managed_workspace_sheet_url ?? "")
+      setConnectionMessage(
+        data.already_provisioned
+          ? "Chameleon Sheets are already provisioned for this workspace."
+          : "Chameleon Sheets created successfully in your Google Drive."
+      )
+    } catch {
+      setConnectionError("Failed to create Chameleon Sheets.")
+    } finally {
+      setProvisioning(false)
+      checkConnection()
     }
   }
 
@@ -388,12 +428,26 @@ export default function SettingsPage() {
           in your Drive, meal plans can sync through Google Sheets, and confirmed
           appointments can be added to your Google Calendar.
         </p>
-        <p className="text-sm text-gf-muted mb-4">
-          If you connected Google before Calendar sync was added, reconnect once
-          to grant the new Calendar permission.
-        </p>
+        {connected && !sheetsProvisioned && (
+          <p className="text-sm text-gf-muted mb-4">
+            Google is connected. Create Chameleon Sheets so your workspace has the
+            structured Google Sheets setup the app can use.
+          </p>
+        )}
+        {connected && sheetsProvisioned && (
+          <p className="text-sm text-gf-muted mb-4">
+            Your Chameleon-managed starter sheets are provisioned and ready in
+            your Google Drive.
+          </p>
+        )}
+        {!connected && (
+          <p className="text-sm text-gf-muted mb-4">
+            If Google permissions change later, you can reconnect after the
+            initial connection is in place.
+          </p>
+        )}
 
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             {connected === null ? (
               <Badge>Checking...</Badge>
@@ -401,6 +455,9 @@ export default function SettingsPage() {
               <>
                 <CheckCircle size={16} className="text-green-400" />
                 <Badge variant="success">Connected</Badge>
+                <Badge variant={sheetsProvisioned ? "success" : "warning"}>
+                  {sheetsProvisioned ? "Chameleon Sheets ready" : "Sheets not provisioned"}
+                </Badge>
               </>
             ) : (
               <>
@@ -421,14 +478,28 @@ export default function SettingsPage() {
                 {disconnecting ? "Disconnecting..." : "Disconnect"}
               </Button>
             )}
-            <Button
-              variant={connected ? "secondary" : "primary"}
-              size="sm"
-              onClick={handleConnect}
-            >
-              <Link2 size={14} className="mr-1.5" />
-              {connected ? "Reconnect" : "Connect Google"}
-            </Button>
+            {connected ? (
+              sheetsProvisioned ? (
+                managedWorkspaceSheetUrl ? (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => window.open(managedWorkspaceSheetUrl, "_blank", "noopener,noreferrer")}
+                  >
+                    Open Chameleon Sheets
+                  </Button>
+                ) : null
+              ) : (
+                <Button size="sm" onClick={handleCreateChameleonSheets} disabled={provisioning}>
+                  {provisioning ? "Creating..." : "Create Chameleon Sheets"}
+                </Button>
+              )
+            ) : (
+              <Button variant="primary" size="sm" onClick={handleConnect}>
+                <Link2 size={14} className="mr-1.5" />
+                Connect Google
+              </Button>
+            )}
           </div>
         </div>
       </Card>

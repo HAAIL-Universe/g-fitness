@@ -60,6 +60,10 @@ export interface AdminSettings {
     | 'gym_studio_owner'
     | null
   active_modules: string[] | null
+  managed_workspace_sheet_id: string | null
+  managed_workspace_sheet_url: string | null
+  managed_workspace_sheet_modules: string[] | null
+  managed_workspace_sheet_provisioned_at: string | null
   appointment_booking_mode: 'coach_only' | 'client_request_visible_slots' | null
   created_at: string
   updated_at: string

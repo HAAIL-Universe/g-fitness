@@ -58,6 +58,8 @@ Multi-coach architecture is now part of the current product. The old single-admi
 ### Google Sheets
 
 - Each coach connects their own Google account
+- Google connection and Chameleon-managed sheet provisioning are distinct settings steps
+- Once Google is connected, settings should prompt the coach to create Chameleon-managed starter sheets for the current workspace module set
 - Each client gets one Google Sheet created from the platform template
 - Meal plans are read from the client Sheet
 - Progress entries are appended back to the client Sheet
