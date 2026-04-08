@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
+import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 import {
@@ -12,7 +13,7 @@ import {
   Calendar,
   LogOut,
 } from "lucide-react"
-import { PLATFORM_NAME } from "@/lib/platform"
+import { DEFAULT_COACH_BRANDING, type CoachBranding } from "@/lib/branding"
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -25,6 +26,14 @@ const navItems = [
 export function ClientNav() {
   const pathname = usePathname()
   const router = useRouter()
+  const [branding, setBranding] = useState<CoachBranding>(DEFAULT_COACH_BRANDING)
+
+  useEffect(() => {
+    fetch("/api/client/branding")
+      .then((res) => (res.ok ? res.json() : DEFAULT_COACH_BRANDING))
+      .then((data) => setBranding(data))
+      .catch(() => setBranding(DEFAULT_COACH_BRANDING))
+  }, [])
 
   async function handleLogout() {
     const supabase = createClient()
@@ -37,7 +46,28 @@ export function ClientNav() {
       {/* Desktop sidebar */}
       <nav className="hidden md:flex flex-col w-64 min-h-screen bg-gf-dark border-r border-gf-border p-6">
         <Link href="/dashboard" className="mb-10">
-          <h1 className="text-2xl font-bold">{PLATFORM_NAME}</h1>
+          <div className="flex items-center gap-3">
+            {branding.brand_logo_url ? (
+              <img
+                src={branding.brand_logo_url}
+                alt={`${branding.brand_title} logo`}
+                className="h-10 w-10 rounded-xl object-cover"
+              />
+            ) : (
+              <div
+                className="flex h-10 w-10 items-center justify-center rounded-xl text-sm font-bold text-white"
+                style={{ backgroundColor: branding.brand_primary_color }}
+              >
+                {branding.brand_title.slice(0, 1).toUpperCase()}
+              </div>
+            )}
+            <div>
+              <h1 className="text-xl font-bold" style={{ color: branding.brand_primary_color }}>
+                {branding.brand_title}
+              </h1>
+              <p className="text-xs text-gf-muted">Client portal</p>
+            </div>
+          </div>
         </Link>
 
         <div className="flex flex-col gap-1 flex-1">
@@ -48,9 +78,17 @@ export function ClientNav() {
               className={cn(
                 "flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm transition-colors",
                 pathname === href
-                  ? "bg-gf-pink/10 text-gf-pink font-medium"
+                  ? "font-medium"
                   : "text-gf-muted hover:text-white hover:bg-gf-surface"
               )}
+              style={
+                pathname === href
+                  ? {
+                      color: branding.brand_primary_color,
+                      backgroundColor: `${branding.brand_primary_color}18`,
+                    }
+                  : undefined
+              }
             >
               <Icon size={18} />
               {label}
@@ -65,6 +103,7 @@ export function ClientNav() {
           <LogOut size={18} />
           Log out
         </button>
+
       </nav>
 
       {/* Mobile bottom bar */}
@@ -76,8 +115,9 @@ export function ClientNav() {
               href={href}
               className={cn(
                 "flex flex-col items-center gap-1 px-3 py-1.5 text-xs transition-colors",
-                pathname === href ? "text-gf-pink" : "text-gf-muted"
+                pathname === href ? "" : "text-gf-muted"
               )}
+              style={pathname === href ? { color: branding.brand_primary_color } : undefined}
             >
               <Icon size={20} />
               {label}

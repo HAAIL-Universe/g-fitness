@@ -1,9 +1,11 @@
 import { createClient } from "@/lib/supabase/server"
 import { getProfile } from "@/lib/google/sheets"
 import { ClientNav } from "@/components/layout/client-nav"
+import { PoweredBy } from "@/components/branding/powered-by"
 import { Card } from "@/components/ui/card"
 import { LogoutButton } from "@/components/logout-button"
 import { redirect } from "next/navigation"
+import { getCoachBrandingByCoachId } from "@/lib/branding-server"
 
 export const dynamic = 'force-dynamic'
 
@@ -30,6 +32,7 @@ export default async function ProfilePage() {
       // Sheet not accessible
     }
   }
+  const branding = await getCoachBrandingByCoachId(client?.coach_id)
 
   const fields = profile
     ? [
@@ -53,7 +56,9 @@ export default async function ProfilePage() {
       <ClientNav />
       <main className="flex-1 p-6 md:p-10 pb-24 md:pb-10">
         <div className="max-w-3xl mx-auto">
-          <h1 className="text-2xl font-bold mb-2">Profile</h1>
+          <h1 className="text-2xl font-bold mb-2" style={{ color: branding.brand_primary_color }}>
+            Profile
+          </h1>
           <p className="text-gf-muted mb-8">Your details on file</p>
 
           {profile ? (
@@ -79,6 +84,7 @@ export default async function ProfilePage() {
           )}
 
           <LogoutButton />
+          {branding.show_powered_by && <PoweredBy className="mt-8" />}
         </div>
       </main>
     </div>

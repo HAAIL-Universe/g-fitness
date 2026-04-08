@@ -6,7 +6,7 @@ import { Input, TextArea } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Card, CardTitle } from "@/components/ui/card"
 
-export function ProgressForm() {
+export function ProgressForm({ primaryColor = "#ff2d8a" }: { primaryColor?: string }) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
@@ -77,7 +77,12 @@ export function ProgressForm() {
           <p className="text-sm text-green-400">Logged successfully</p>
         )}
 
-        <Button type="submit" disabled={loading} className="w-full">
+        <Button
+          type="submit"
+          disabled={loading}
+          className="w-full"
+          style={{ backgroundColor: primaryColor }}
+        >
           {loading ? "Saving..." : "Log Progress"}
         </Button>
       </form>

@@ -2,10 +2,12 @@ import { createClient } from "@/lib/supabase/server"
 import { getMealPlan, getProgress } from "@/lib/google/sheets"
 import type { MealPlanDay, ProgressEntry } from "@/types"
 import { ClientNav } from "@/components/layout/client-nav"
+import { PoweredBy } from "@/components/branding/powered-by"
 import { TodaysMeals } from "@/components/meal-plan/meal-plan-view"
 import { ProgressForm } from "@/components/progress/progress-form"
 import { Card } from "@/components/ui/card"
 import { redirect } from "next/navigation"
+import { getCoachBrandingByCoachId } from "@/lib/branding-server"
 
 export const dynamic = 'force-dynamic'
 
@@ -40,12 +42,37 @@ export default async function DashboardPage() {
   const latestWeight = [...progress]
     .reverse()
     .find((e) => e.weight)?.weight
+  const branding = await getCoachBrandingByCoachId(client?.coach_id)
 
   return (
     <div className="flex min-h-screen">
       <ClientNav />
       <main className="flex-1 p-6 md:p-10 pb-24 md:pb-10">
         <div className="max-w-3xl mx-auto">
+          <div className="mb-6 flex items-center gap-3">
+            {branding.brand_logo_url ? (
+              <img
+                src={branding.brand_logo_url}
+                alt={`${branding.brand_title} logo`}
+                className="h-12 w-12 rounded-xl object-cover"
+              />
+            ) : (
+              <div
+                className="flex h-12 w-12 items-center justify-center rounded-xl text-sm font-bold text-white"
+                style={{ backgroundColor: branding.brand_primary_color }}
+              >
+                {branding.brand_title.slice(0, 1).toUpperCase()}
+              </div>
+            )}
+            <div>
+              <p className="text-sm font-medium" style={{ color: branding.brand_primary_color }}>
+                {branding.brand_title}
+              </p>
+              <p className="text-sm" style={{ color: branding.brand_accent_color }}>
+                {branding.brand_welcome_text}
+              </p>
+            </div>
+          </div>
           <h1 className="text-2xl font-bold mb-2">
             Hey, {client?.name?.split(" ")[0] || "there"} 👋
           </h1>
@@ -57,7 +84,7 @@ export default async function DashboardPage() {
               <div className="grid grid-cols-2 gap-4">
                 <Card>
                   <p className="text-xs text-gf-muted">Latest Weight</p>
-                  <p className="text-2xl font-bold text-gf-pink mt-1">
+                  <p className="text-2xl font-bold mt-1" style={{ color: branding.brand_primary_color }}>
                     {latestWeight}
                   </p>
                 </Card>
@@ -70,8 +97,13 @@ export default async function DashboardPage() {
               </div>
             )}
 
-            <TodaysMeals mealPlan={mealPlan} />
-            <ProgressForm />
+            <TodaysMeals
+              mealPlan={mealPlan}
+              primaryColor={branding.brand_primary_color}
+              accentColor={branding.brand_accent_color}
+            />
+            <ProgressForm primaryColor={branding.brand_primary_color} />
+            {branding.show_powered_by && <PoweredBy />}
           </div>
         </div>
       </main>

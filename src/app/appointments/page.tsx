@@ -2,9 +2,11 @@
 
 import { useState, useEffect } from "react"
 import { ClientNav } from "@/components/layout/client-nav"
+import { PoweredBy } from "@/components/branding/powered-by"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { DEFAULT_COACH_BRANDING, type CoachBranding } from "@/lib/branding"
 
 type Appointment = {
   id: string
@@ -26,6 +28,7 @@ function statusBadge(status: Appointment["status"]) {
 
 export default function AppointmentsPage() {
   const [appointments, setAppointments] = useState<Appointment[]>([])
+  const [branding, setBranding] = useState<CoachBranding>(DEFAULT_COACH_BRANDING)
   const [note, setNote] = useState("")
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState("")
@@ -35,6 +38,11 @@ export default function AppointmentsPage() {
     fetch("/api/appointments")
       .then((r) => r.json())
       .then((d) => setAppointments(d.appointments ?? []))
+
+    fetch("/api/client/branding")
+      .then((r) => (r.ok ? r.json() : DEFAULT_COACH_BRANDING))
+      .then((d) => setBranding(d))
+      .catch(() => setBranding(DEFAULT_COACH_BRANDING))
   }, [])
 
   async function handleRequest(e: React.FormEvent) {
@@ -69,7 +77,9 @@ export default function AppointmentsPage() {
     <div className="flex min-h-screen bg-gf-bg">
       <ClientNav />
       <main className="flex-1 p-6 md:p-8 pb-24 md:pb-8">
-        <h1 className="text-2xl font-bold mb-6">Appointments</h1>
+        <h1 className="text-2xl font-bold mb-6" style={{ color: branding.brand_primary_color }}>
+          Appointments
+        </h1>
 
         <Card className="mb-8">
           <h2 className="text-lg font-semibold mb-4">Request a Session</h2>
@@ -83,7 +93,7 @@ export default function AppointmentsPage() {
             />
             {error && <p className="text-sm text-red-400">{error}</p>}
             {success && <p className="text-sm text-green-400">Request sent! Your coach will be in touch.</p>}
-            <Button type="submit" disabled={submitting}>
+            <Button type="submit" disabled={submitting} style={{ backgroundColor: branding.brand_primary_color }}>
               {submitting ? "Sending..." : "Request Session"}
             </Button>
           </form>
@@ -158,6 +168,8 @@ export default function AppointmentsPage() {
         {appointments.length === 0 && (
           <p className="text-gf-muted text-sm">No appointments yet. Request your first session above.</p>
         )}
+
+        {branding.show_powered_by && <PoweredBy className="mt-8" />}
       </main>
     </div>
   )

@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server"
 import { verifyCoach, isCoachResult } from "@/lib/auth-helpers"
 import { sendInviteEmail } from "@/lib/resend"
 import { generateToken } from "@/lib/utils"
+import { getCoachBrandingByCoachId } from "@/lib/branding-server"
 
 export async function POST(request: NextRequest) {
   const result = await verifyCoach()
@@ -54,7 +55,8 @@ export async function POST(request: NextRequest) {
     })
   }
 
-  await sendInviteEmail(email, name, token)
+  const branding = await getCoachBrandingByCoachId(user.id)
+  await sendInviteEmail(email, name, token, branding)
 
   return NextResponse.json({ ok: true })
 }

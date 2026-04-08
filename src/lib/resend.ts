@@ -1,5 +1,6 @@
 import { Resend } from "resend"
 import { PLATFORM_NAME } from "@/lib/platform"
+import { PLATFORM_BRAND_NAME, type CoachBranding } from "@/lib/branding"
 
 function getResend() {
   return new Resend(process.env.RESEND_API_KEY)
@@ -8,30 +9,54 @@ function getResend() {
 export async function sendInviteEmail(
   to: string,
   clientName: string,
-  inviteToken: string
+  inviteToken: string,
+  branding?: CoachBranding
 ) {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
   const inviteUrl = `${appUrl}/onboarding?token=${inviteToken}`
+  const brandTitle = branding?.brand_title || PLATFORM_BRAND_NAME
+  const brandLogo = branding?.brand_logo_url
+  const primaryColor = branding?.brand_primary_color || "#ff2d8a"
+  const accentColor = branding?.brand_accent_color || "#ff6bb3"
+  const welcomeText =
+    branding?.brand_welcome_text ||
+    "You've been invited to complete your onboarding and get started."
+  const showPoweredBy = branding?.show_powered_by ?? true
 
   await getResend().emails.send({
-    from: `${PLATFORM_NAME} <onboarding@resend.dev>`,
+    from: `${brandTitle} via ${PLATFORM_NAME} <onboarding@resend.dev>`,
     to,
-    subject: `You've been invited to join ${PLATFORM_NAME}`,
+    subject: `You've been invited to join ${brandTitle}`,
     html: `
       <div style="font-family: system-ui, sans-serif; max-width: 480px; margin: 0 auto; background: #0a0a0a; color: #ffffff; padding: 40px; border-radius: 12px;">
-        <h1 style="color: #ff2d8a; font-size: 24px; margin: 0 0 24px 0;">${PLATFORM_NAME}</h1>
+        <div style="display: flex; align-items: center; gap: 12px; margin: 0 0 24px 0;">
+          ${
+            brandLogo
+              ? `<img src="${brandLogo}" alt="${brandTitle} logo" style="width: 48px; height: 48px; border-radius: 12px; object-fit: cover;" />`
+              : `<div style="width: 48px; height: 48px; border-radius: 12px; background: ${primaryColor}; color: #ffffff; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 20px;">${brandTitle.charAt(0).toUpperCase()}</div>`
+          }
+          <div>
+            <h1 style="color: ${primaryColor}; font-size: 24px; margin: 0;">${brandTitle}</h1>
+            <p style="font-size: 14px; color: ${accentColor}; margin: 6px 0 0 0;">${welcomeText}</p>
+          </div>
+        </div>
         <p style="font-size: 16px; line-height: 1.6; margin: 0 0 16px 0;">
           Hi ${clientName},
         </p>
         <p style="font-size: 16px; line-height: 1.6; margin: 0 0 24px 0;">
-          You've been invited to set up your ${PLATFORM_NAME} profile. Click the button below to get started with your onboarding questionnaire.
+          You've been invited to set up your ${brandTitle} profile. Click the button below to get started with your onboarding questionnaire.
         </p>
-        <a href="${inviteUrl}" style="display: inline-block; background: #ff2d8a; color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px;">
+        <a href="${inviteUrl}" style="display: inline-block; background: ${primaryColor}; color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px;">
           Get Started
         </a>
         <p style="font-size: 13px; color: #888888; margin: 32px 0 0 0;">
           This link expires in 7 days. If you didn't expect this email, you can ignore it.
         </p>
+        ${
+          showPoweredBy
+            ? `<p style="font-size: 12px; color: #666666; margin: 20px 0 0 0;">Powered by ${PLATFORM_BRAND_NAME}</p>`
+            : ""
+        }
       </div>
     `,
   })

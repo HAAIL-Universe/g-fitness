@@ -2,8 +2,10 @@ import { createClient } from "@/lib/supabase/server"
 import { getMealPlan } from "@/lib/google/sheets"
 import type { MealPlanDay } from "@/types"
 import { ClientNav } from "@/components/layout/client-nav"
+import { PoweredBy } from "@/components/branding/powered-by"
 import { MealPlanView } from "@/components/meal-plan/meal-plan-view"
 import { redirect } from "next/navigation"
+import { getCoachBrandingByCoachId } from "@/lib/branding-server"
 
 export const dynamic = 'force-dynamic'
 
@@ -30,15 +32,24 @@ export default async function MealPlanPage() {
       // Sheet not accessible
     }
   }
+  const branding = await getCoachBrandingByCoachId(client?.coach_id)
 
   return (
     <div className="flex min-h-screen">
       <ClientNav />
       <main className="flex-1 p-6 md:p-10 pb-24 md:pb-10">
         <div className="max-w-3xl mx-auto">
-          <h1 className="text-2xl font-bold mb-2">Meal Plan</h1>
+          <h1 className="text-2xl font-bold mb-2" style={{ color: branding.brand_primary_color }}>
+            Meal Plan
+          </h1>
           <p className="text-gf-muted mb-8">Your weekly nutrition plan</p>
-          <MealPlanView mealPlan={mealPlan} highlightToday />
+          <MealPlanView
+            mealPlan={mealPlan}
+            highlightToday
+            primaryColor={branding.brand_primary_color}
+            accentColor={branding.brand_accent_color}
+          />
+          {branding.show_powered_by && <PoweredBy className="mt-8" />}
         </div>
       </main>
     </div>

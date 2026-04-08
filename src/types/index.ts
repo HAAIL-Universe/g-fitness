@@ -33,6 +33,12 @@ export interface AdminSettings {
   google_token_expiry: string | null
   display_name: string | null
   business_name: string | null
+  brand_title: string | null
+  brand_logo_url: string | null
+  brand_primary_color: string | null
+  brand_accent_color: string | null
+  brand_welcome_text: string | null
+  show_powered_by: boolean | null
   created_at: string
   updated_at: string
 }

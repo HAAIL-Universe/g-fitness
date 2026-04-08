@@ -4,10 +4,18 @@
 -- Admin settings (stores Eliot's Google OAuth tokens)
 create table admin_settings (
   id uuid primary key default gen_random_uuid(),
-  user_id uuid references auth.users(id) on delete cascade,
+  user_id uuid references auth.users(id) on delete cascade unique,
   google_refresh_token text,
   google_access_token text,
   google_token_expiry timestamptz,
+  display_name text,
+  business_name text,
+  brand_title text,
+  brand_logo_url text,
+  brand_primary_color text,
+  brand_accent_color text,
+  brand_welcome_text text,
+  show_powered_by boolean default true,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );

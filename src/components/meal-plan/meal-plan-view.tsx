@@ -7,6 +7,8 @@ import { UtensilsCrossed } from "lucide-react"
 interface Props {
   mealPlan: MealPlanDay[]
   highlightToday?: boolean
+  primaryColor?: string
+  accentColor?: string
 }
 
 const dayNames = [
@@ -23,7 +25,12 @@ function getTodayName(): string {
   return dayNames[((new Date().getDay() + 6) % 7)]
 }
 
-export function MealPlanView({ mealPlan, highlightToday = false }: Props) {
+export function MealPlanView({
+  mealPlan,
+  highlightToday = false,
+  primaryColor = "#ff2d8a",
+  accentColor = "#ff6bb3",
+}: Props) {
   const today = getTodayName()
 
   if (mealPlan.length === 0) {
@@ -53,7 +60,13 @@ export function MealPlanView({ mealPlan, highlightToday = false }: Props) {
             <div className="flex items-center gap-2 mb-4">
               <h3 className="font-semibold text-white">{day.day}</h3>
               {isToday && (
-                <span className="text-xs bg-gf-pink/20 text-gf-pink px-2 py-0.5 rounded-full">
+                <span
+                  className="text-xs px-2 py-0.5 rounded-full"
+                  style={{
+                    backgroundColor: `${primaryColor}20`,
+                    color: primaryColor,
+                  }}
+                >
                   Today
                 </span>
               )}
@@ -63,10 +76,10 @@ export function MealPlanView({ mealPlan, highlightToday = false }: Props) {
               <p className="text-sm text-gf-muted">Not yet planned</p>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <MealSlot label="Breakfast" content={day.breakfast} />
-                <MealSlot label="Lunch" content={day.lunch} />
-                <MealSlot label="Dinner" content={day.dinner} />
-                <MealSlot label="Snacks" content={day.snacks} />
+                <MealSlot label="Breakfast" content={day.breakfast} accentColor={accentColor} />
+                <MealSlot label="Lunch" content={day.lunch} accentColor={accentColor} />
+                <MealSlot label="Dinner" content={day.dinner} accentColor={accentColor} />
+                <MealSlot label="Snacks" content={day.snacks} accentColor={accentColor} />
               </div>
             )}
           </Card>
@@ -76,18 +89,34 @@ export function MealPlanView({ mealPlan, highlightToday = false }: Props) {
   )
 }
 
-function MealSlot({ label, content }: { label: string; content: string }) {
+function MealSlot({
+  label,
+  content,
+  accentColor = "#ff6bb3",
+}: {
+  label: string
+  content: string
+  accentColor?: string
+}) {
   if (!content) return null
 
   return (
     <div>
-      <p className="text-xs text-gf-pink font-medium mb-1">{label}</p>
+      <p className="text-xs font-medium mb-1" style={{ color: accentColor }}>{label}</p>
       <p className="text-sm text-white/90">{content}</p>
     </div>
   )
 }
 
-export function TodaysMeals({ mealPlan }: { mealPlan: MealPlanDay[] }) {
+export function TodaysMeals({
+  mealPlan,
+  primaryColor = "#ff2d8a",
+  accentColor = "#ff6bb3",
+}: {
+  mealPlan: MealPlanDay[]
+  primaryColor?: string
+  accentColor?: string
+}) {
   const today = getTodayName()
   const todayPlan = mealPlan.find((d) => d.day === today)
 
@@ -102,12 +131,12 @@ export function TodaysMeals({ mealPlan }: { mealPlan: MealPlanDay[] }) {
 
   return (
     <Card glow>
-      <h3 className="font-semibold mb-4">Today&apos;s Meals</h3>
+      <h3 className="font-semibold mb-4" style={{ color: primaryColor }}>Today&apos;s Meals</h3>
       <div className="space-y-3">
-        <MealSlot label="Breakfast" content={todayPlan.breakfast} />
-        <MealSlot label="Lunch" content={todayPlan.lunch} />
-        <MealSlot label="Dinner" content={todayPlan.dinner} />
-        <MealSlot label="Snacks" content={todayPlan.snacks} />
+        <MealSlot label="Breakfast" content={todayPlan.breakfast} accentColor={accentColor} />
+        <MealSlot label="Lunch" content={todayPlan.lunch} accentColor={accentColor} />
+        <MealSlot label="Dinner" content={todayPlan.dinner} accentColor={accentColor} />
+        <MealSlot label="Snacks" content={todayPlan.snacks} accentColor={accentColor} />
       </div>
     </Card>
   )

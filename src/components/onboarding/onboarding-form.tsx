@@ -6,6 +6,7 @@ import { Input, TextArea, Select } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import type { OnboardingData } from "@/types"
+import type { CoachBranding } from "@/lib/branding"
 
 const activityOptions = [
   { value: "sedentary", label: "Sedentary (little or no exercise)" },
@@ -37,9 +38,10 @@ const steps = [
 interface Props {
   token: string
   email: string
+  branding: CoachBranding
 }
 
-export function OnboardingForm({ token, email }: Props) {
+export function OnboardingForm({ token, email, branding }: Props) {
   const router = useRouter()
   const [step, setStep] = useState(0)
   const [loading, setLoading] = useState(false)
@@ -109,6 +111,7 @@ export function OnboardingForm({ token, email }: Props) {
               className={`h-1 rounded-full transition-colors ${
                 i <= step ? "bg-gf-pink" : "bg-gf-border"
               }`}
+              style={i <= step ? { backgroundColor: branding.brand_primary_color } : undefined}
             />
             <span className="text-[10px] text-gf-muted">{s.title}</span>
           </div>
@@ -244,11 +247,13 @@ export function OnboardingForm({ token, email }: Props) {
           )}
 
           {isLastStep ? (
-            <Button onClick={handleSubmit} disabled={loading}>
+            <Button onClick={handleSubmit} disabled={loading} style={{ backgroundColor: branding.brand_primary_color }}>
               {loading ? "Setting up..." : "Complete Setup"}
             </Button>
           ) : (
-            <Button onClick={() => setStep(step + 1)}>Continue</Button>
+            <Button onClick={() => setStep(step + 1)} style={{ backgroundColor: branding.brand_primary_color }}>
+              Continue
+            </Button>
           )}
         </div>
       </Card>

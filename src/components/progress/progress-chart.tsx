@@ -14,9 +14,10 @@ import type { ProgressEntry } from "@/types"
 
 interface Props {
   entries: ProgressEntry[]
+  primaryColor?: string
 }
 
-export function ProgressChart({ entries }: Props) {
+export function ProgressChart({ entries, primaryColor = "#ff2d8a" }: Props) {
   const chartData = entries
     .filter((e) => e.weight)
     .map((e) => ({
@@ -66,9 +67,9 @@ export function ProgressChart({ entries }: Props) {
             <Line
               type="monotone"
               dataKey="weight"
-              stroke="#ff2d8a"
+              stroke={primaryColor}
               strokeWidth={2}
-              dot={{ fill: "#ff2d8a", r: 4 }}
+              dot={{ fill: primaryColor, r: 4 }}
               activeDot={{ r: 6 }}
             />
           </LineChart>
@@ -78,7 +79,7 @@ export function ProgressChart({ entries }: Props) {
   )
 }
 
-export function ProgressHistory({ entries }: Props) {
+export function ProgressHistory({ entries, primaryColor = "#ff2d8a" }: Props) {
   if (entries.length === 0) {
     return null
   }
@@ -108,7 +109,7 @@ export function ProgressHistory({ entries }: Props) {
               )}
             </div>
             {entry.weight && (
-              <span className="text-sm font-semibold text-gf-pink">
+              <span className="text-sm font-semibold" style={{ color: primaryColor }}>
                 {entry.weight}
               </span>
             )}

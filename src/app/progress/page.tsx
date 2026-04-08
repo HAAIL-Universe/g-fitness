@@ -2,9 +2,11 @@ import { createClient } from "@/lib/supabase/server"
 import { getProgress } from "@/lib/google/sheets"
 import type { ProgressEntry } from "@/types"
 import { ClientNav } from "@/components/layout/client-nav"
+import { PoweredBy } from "@/components/branding/powered-by"
 import { ProgressForm } from "@/components/progress/progress-form"
 import { ProgressChart, ProgressHistory } from "@/components/progress/progress-chart"
 import { redirect } from "next/navigation"
+import { getCoachBrandingByCoachId } from "@/lib/branding-server"
 
 export const dynamic = 'force-dynamic'
 
@@ -31,21 +33,25 @@ export default async function ProgressPage() {
       // Sheet not accessible
     }
   }
+  const branding = await getCoachBrandingByCoachId(client?.coach_id)
 
   return (
     <div className="flex min-h-screen">
       <ClientNav />
       <main className="flex-1 p-6 md:p-10 pb-24 md:pb-10">
         <div className="max-w-3xl mx-auto">
-          <h1 className="text-2xl font-bold mb-2">Progress</h1>
+          <h1 className="text-2xl font-bold mb-2" style={{ color: branding.brand_primary_color }}>
+            Progress
+          </h1>
           <p className="text-gf-muted mb-8">
             Track your journey and see how far you&apos;ve come
           </p>
 
           <div className="grid gap-6">
-            <ProgressForm />
-            <ProgressChart entries={progress} />
-            <ProgressHistory entries={progress} />
+            <ProgressForm primaryColor={branding.brand_primary_color} />
+            <ProgressChart entries={progress} primaryColor={branding.brand_primary_color} />
+            <ProgressHistory entries={progress} primaryColor={branding.brand_primary_color} />
+            {branding.show_powered_by && <PoweredBy />}
           </div>
         </div>
       </main>

@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server"
 import { createAdmin } from "@/lib/supabase/server"
 import { createClientSheet } from "@/lib/google/template"
 import type { OnboardingData } from "@/types"
+import { getCoachBrandingByCoachId } from "@/lib/branding-server"
 
 // GET: validate token
 export async function GET(request: NextRequest) {
@@ -14,7 +15,7 @@ export async function GET(request: NextRequest) {
   const supabase = createAdmin()
   const { data: client } = await supabase
     .from("clients")
-    .select("email, invite_expires_at, onboarding_completed")
+    .select("email, invite_expires_at, onboarding_completed, coach_id")
     .eq("invite_token", token)
     .single()
 
@@ -22,18 +23,20 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ valid: false, reason: "invalid" })
   }
 
+  const branding = await getCoachBrandingByCoachId(client.coach_id)
+
   if (client.onboarding_completed) {
-    return NextResponse.json({ valid: false, reason: "already_used" })
+    return NextResponse.json({ valid: false, reason: "already_used", branding })
   }
 
   if (
     client.invite_expires_at &&
     new Date(client.invite_expires_at) < new Date()
   ) {
-    return NextResponse.json({ valid: false, reason: "expired" })
+    return NextResponse.json({ valid: false, reason: "expired", branding })
   }
 
-  return NextResponse.json({ valid: true, email: client.email })
+  return NextResponse.json({ valid: true, email: client.email, branding })
 }
 
 // POST: complete onboarding
