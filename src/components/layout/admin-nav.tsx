@@ -5,7 +5,17 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
-import { LayoutDashboard, Users, Settings, LogOut, Calendar, Layers3, Menu, X } from "lucide-react"
+import {
+  LayoutDashboard,
+  Users,
+  Settings,
+  LogOut,
+  Calendar,
+  Layers3,
+  Menu,
+  X,
+  Gem,
+} from "lucide-react"
 import { PLATFORM_NAME } from "@/lib/platform"
 
 const navItems = [
@@ -13,6 +23,7 @@ const navItems = [
   { href: "/admin/clients", label: "Clients", icon: Users },
   { href: "/admin/appointments", label: "Appointments", icon: Calendar },
   { href: "/admin/modules", label: "Modules", icon: Layers3 },
+  { href: "/admin/premium", label: "Premium", icon: Gem },
   { href: "/admin/settings", label: "Settings", icon: Settings },
 ]
 

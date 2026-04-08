@@ -4,11 +4,10 @@ import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Input, TextArea } from "@/components/ui/input"
+import { Input } from "@/components/ui/input"
 import { Card, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Link2, CheckCircle, AlertCircle, ArrowRight, CreditCard, Layers3 } from "lucide-react"
-import { DEFAULT_COACH_BRANDING } from "@/lib/branding"
 import { type CoachTypePreset, type EnableableModule } from "@/lib/modules"
 import { DeleteAccountCard } from "@/components/account/delete-account-card"
 
@@ -29,18 +28,6 @@ export default function SettingsPage() {
 
   const [displayName, setDisplayName] = useState("")
   const [businessName, setBusinessName] = useState("")
-  const [brandTitle, setBrandTitle] = useState(DEFAULT_COACH_BRANDING.brand_title)
-  const [brandLogoUrl, setBrandLogoUrl] = useState("")
-  const [brandPrimaryColor, setBrandPrimaryColor] = useState(
-    DEFAULT_COACH_BRANDING.brand_primary_color
-  )
-  const [brandAccentColor, setBrandAccentColor] = useState(
-    DEFAULT_COACH_BRANDING.brand_accent_color
-  )
-  const [brandWelcomeText, setBrandWelcomeText] = useState(
-    DEFAULT_COACH_BRANDING.brand_welcome_text
-  )
-  const [showPoweredBy, setShowPoweredBy] = useState(true)
   const [coachTypePreset, setCoachTypePreset] = useState<CoachTypePreset | null>(null)
   const [activeModules, setActiveModules] = useState<EnableableModule[]>([])
   const [profileLoading, setProfileLoading] = useState(false)
@@ -116,18 +103,6 @@ export default function SettingsPage() {
       .then((data) => {
         setDisplayName(data.display_name ?? "")
         setBusinessName(data.business_name ?? "")
-        setBrandTitle(data.brand_title ?? DEFAULT_COACH_BRANDING.brand_title)
-        setBrandLogoUrl(data.brand_logo_url ?? "")
-        setBrandPrimaryColor(
-          data.brand_primary_color ?? DEFAULT_COACH_BRANDING.brand_primary_color
-        )
-        setBrandAccentColor(
-          data.brand_accent_color ?? DEFAULT_COACH_BRANDING.brand_accent_color
-        )
-        setBrandWelcomeText(
-          data.brand_welcome_text ?? DEFAULT_COACH_BRANDING.brand_welcome_text
-        )
-        setShowPoweredBy(data.show_powered_by ?? true)
         setCoachTypePreset(data.coach_type_preset ?? null)
         setActiveModules(Array.isArray(data.active_modules) ? data.active_modules : [])
       })
@@ -146,12 +121,6 @@ export default function SettingsPage() {
         body: JSON.stringify({
           display_name: displayName,
           business_name: businessName,
-          brand_title: brandTitle,
-          brand_logo_url: brandLogoUrl,
-          brand_primary_color: brandPrimaryColor,
-          brand_accent_color: brandAccentColor,
-          brand_welcome_text: brandWelcomeText,
-          show_powered_by: showPoweredBy,
           coach_type_preset: coachTypePreset,
           active_modules: activeModules,
         }),
@@ -312,106 +281,6 @@ export default function SettingsPage() {
           </Link>
         </div>
       </Card>
-
-      <section className="mb-6">
-        <div className="mb-3">
-          <h2 className="text-lg font-semibold">Premium</h2>
-          <p className="mt-1 text-sm text-gf-muted">
-            Premium features live here so future upgrades can be added without cluttering general settings.
-          </p>
-        </div>
-        <Card>
-          <CardTitle>Client Branding</CardTitle>
-          <p className="text-sm text-gf-muted mt-2 mb-4">
-            Lightweight branding for client-facing, invite, and onboarding surfaces.
-          </p>
-          <form onSubmit={saveProfile} className="space-y-4">
-            <Input
-              label="Brand Title"
-              value={brandTitle}
-              onChange={(e) => setBrandTitle(e.target.value)}
-              placeholder="e.g. Eliot Nutrition"
-            />
-            <Input
-              label="Logo URL"
-              value={brandLogoUrl}
-              onChange={(e) => setBrandLogoUrl(e.target.value)}
-              placeholder="https://..."
-            />
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Input
-                label="Primary Color"
-                type="color"
-                value={brandPrimaryColor}
-                onChange={(e) => setBrandPrimaryColor(e.target.value)}
-                className="h-12"
-              />
-              <Input
-                label="Accent Color"
-                type="color"
-                value={brandAccentColor}
-                onChange={(e) => setBrandAccentColor(e.target.value)}
-                className="h-12"
-              />
-            </div>
-            <TextArea
-              label="Welcome Text"
-              value={brandWelcomeText}
-              onChange={(e) => setBrandWelcomeText(e.target.value)}
-              placeholder="Short welcome shown to clients during onboarding and in the client portal."
-            />
-            <label className="flex items-center gap-3 text-sm text-white">
-              <input
-                type="checkbox"
-                checked={showPoweredBy}
-                onChange={(e) => setShowPoweredBy(e.target.checked)}
-                className="h-4 w-4 rounded border-gf-border bg-gf-surface"
-              />
-              Show "Powered by Chameleon Coach"
-            </label>
-            <div className="rounded-xl border border-gf-border bg-gf-surface p-4">
-              <div className="flex items-center gap-3">
-                {brandLogoUrl ? (
-                  <img
-                    src={brandLogoUrl}
-                    alt={`${brandTitle || "Brand"} logo`}
-                    className="h-10 w-10 rounded-lg object-cover"
-                  />
-                ) : (
-                  <div
-                    className="flex h-10 w-10 items-center justify-center rounded-lg text-sm font-bold text-white"
-                    style={{ backgroundColor: brandPrimaryColor }}
-                  >
-                    {(brandTitle || "C").slice(0, 1).toUpperCase()}
-                  </div>
-                )}
-                <div>
-                  <p className="font-semibold" style={{ color: brandPrimaryColor }}>
-                    {brandTitle || DEFAULT_COACH_BRANDING.brand_title}
-                  </p>
-                  <p className="text-sm" style={{ color: brandAccentColor }}>
-                    {brandWelcomeText || DEFAULT_COACH_BRANDING.brand_welcome_text}
-                  </p>
-                </div>
-              </div>
-              {showPoweredBy && (
-                <p className="mt-4 text-xs text-gf-muted/70">Powered by Chameleon Coach</p>
-              )}
-            </div>
-            {profileError && <p className="text-sm text-red-400">{profileError}</p>}
-            <div className="flex items-center gap-3">
-              <Button type="submit" disabled={profileLoading} size="sm">
-                {profileLoading ? "Saving..." : "Save Branding"}
-              </Button>
-              {profileSaved && (
-                <span className="text-sm text-green-400 flex items-center gap-1">
-                  <CheckCircle size={14} /> Saved
-                </span>
-              )}
-            </div>
-          </form>
-        </Card>
-      </section>
 
       <Card>
         <CardTitle>Google Sheets + Drive Connection</CardTitle>
