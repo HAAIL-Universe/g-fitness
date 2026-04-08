@@ -83,7 +83,7 @@ async function lookupDriveFileById(
   try {
     const file = await drive.files.get({
       fileId,
-      fields: "id, mimeType, webViewLink, trashed",
+      fields: "id, mimeType, webViewLink, trashed, parents",
     })
 
     if (!file.data.id || file.data.trashed) {
@@ -92,6 +92,7 @@ async function lookupDriveFileById(
 
     return {
       id: file.data.id,
+      parents: file.data.parents ?? [],
       url:
         file.data.webViewLink
         || (file.data.mimeType === "application/vnd.google-apps.folder"
@@ -184,7 +185,24 @@ async function ensureDriveFolder(
 ) {
   const existing = await lookupDriveFileById(drive, existingId)
   if (existing) {
-    return { ...existing, created: false }
+    if (parentId && !existing.parents.includes(parentId)) {
+      const moved = await drive.files.update({
+        fileId: existing.id,
+        addParents: parentId,
+        removeParents: existing.parents.join(","),
+        fields: "id, webViewLink, parents",
+      })
+
+      return {
+        id: moved.data.id ?? existing.id,
+        url: moved.data.webViewLink || folderUrl(moved.data.id ?? existing.id),
+        parents: moved.data.parents ?? [parentId],
+        created: false,
+        moved: true,
+      }
+    }
+
+    return { ...existing, created: false, moved: false }
   }
 
   const found = await findDriveFileByName(drive, {
@@ -201,7 +219,7 @@ async function ensureDriveFolder(
     mimeType: "application/vnd.google-apps.folder",
     parentId,
   })
-  return { ...created, created: true }
+  return { ...created, parents: parentId ? [parentId] : [], created: true, moved: false }
 }
 
 async function ensureSpreadsheetFile(
@@ -218,7 +236,24 @@ async function ensureSpreadsheetFile(
 ) {
   const existing = await lookupDriveFileById(drive, existingId)
   if (existing) {
-    return { ...existing, created: false }
+    if (!existing.parents.includes(parentId)) {
+      const moved = await drive.files.update({
+        fileId: existing.id,
+        addParents: parentId,
+        removeParents: existing.parents.join(","),
+        fields: "id, webViewLink, parents",
+      })
+
+      return {
+        id: moved.data.id ?? existing.id,
+        url: moved.data.webViewLink || spreadsheetUrl(moved.data.id ?? existing.id),
+        parents: moved.data.parents ?? [parentId],
+        created: false,
+        moved: true,
+      }
+    }
+
+    return { ...existing, created: false, moved: false }
   }
 
   const found = await findDriveFileByName(drive, {
@@ -235,7 +270,7 @@ async function ensureSpreadsheetFile(
     mimeType: "application/vnd.google-apps.spreadsheet",
     parentId,
   })
-  return { ...created, created: true }
+  return { ...created, parents: [parentId], created: true, moved: false }
 }
 
 async function getSheetTitles(

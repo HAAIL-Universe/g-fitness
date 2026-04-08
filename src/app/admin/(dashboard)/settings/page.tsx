@@ -167,18 +167,20 @@ export default function SettingsPage() {
 
       if (!response.ok) {
         setConnectionError(data.error || "Failed to create Chameleon Sheets.")
+        setWorkspaceStatus(data.workspace_status ?? "missing")
+        setMissingArtifacts(Array.isArray(data.missing_artifacts) ? data.missing_artifacts : [])
         return
       }
 
-      setSheetsProvisioned(true)
+      setSheetsProvisioned(data.workspace_status === "healthy")
       setManagedWorkspaceSheetUrl(data.managed_workspace_sheet_url ?? "")
       setManagedWorkspaceRootFolderUrl(data.managed_workspace_root_folder_url ?? "")
-      setWorkspaceStatus("healthy")
-      setMissingArtifacts([])
+      setWorkspaceStatus(data.workspace_status ?? "healthy")
+      setMissingArtifacts(Array.isArray(data.missing_artifacts) ? data.missing_artifacts : [])
       setConnectionMessage(
         data.already_provisioned
           ? "The coach-owned Drive workspace is already provisioned."
-          : "The coach-owned Drive workspace and control workbook were created in your Google Drive."
+          : "The coach-owned Drive workspace, control workbook, and required folders were created in your Google Drive."
       )
     } catch {
       setConnectionError("Failed to create Chameleon Sheets.")

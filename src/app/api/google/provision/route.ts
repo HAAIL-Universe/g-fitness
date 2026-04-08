@@ -6,7 +6,10 @@ import {
   normalizeCoachTypePreset,
   resolveActiveModules,
 } from "@/lib/modules"
-import { createCoachWorkspaceSheet } from "@/lib/google/template"
+import {
+  createCoachWorkspaceSheet,
+  getCoachDriveWorkspaceHealth,
+} from "@/lib/google/template"
 
 export async function POST() {
   const result = await verifyCoach()
@@ -37,6 +40,32 @@ export async function POST() {
       existing: settings,
     })
 
+    const provisionedAt = new Date().toISOString()
+    const verifiedHealth = await getCoachDriveWorkspaceHealth({
+      coachId: user.id,
+      activeModules: currentModules,
+      settings: {
+        google_refresh_token: settings.google_refresh_token,
+        managed_workspace_sheet_id: workspaceSheet.sheetId,
+        managed_workspace_root_folder_id: workspaceSheet.rootFolderId,
+        managed_clients_folder_id: workspaceSheet.clientsFolderId,
+        managed_pt_library_sheet_id: workspaceSheet.ptLibrarySheetId,
+        managed_nutrition_library_sheet_id: workspaceSheet.nutritionLibrarySheetId,
+        managed_workspace_sheet_provisioned_at: provisionedAt,
+      },
+    })
+
+    if (verifiedHealth.status !== "healthy") {
+      return NextResponse.json(
+        {
+          error: `Provisioning did not complete the full Drive workspace: ${verifiedHealth.missingArtifacts.join(", ")}`,
+          workspace_status: verifiedHealth.status,
+          missing_artifacts: verifiedHealth.missingArtifacts,
+        },
+        { status: 500 }
+      )
+    }
+
     const updatePayload = {
       user_id: user.id,
       managed_workspace_sheet_id: workspaceSheet.sheetId,
@@ -50,7 +79,7 @@ export async function POST() {
       managed_nutrition_library_sheet_id: workspaceSheet.nutritionLibrarySheetId,
       managed_nutrition_library_sheet_url: workspaceSheet.nutritionLibrarySheetUrl,
       managed_workspace_sheet_modules: currentModules,
-      managed_workspace_sheet_provisioned_at: new Date().toISOString(),
+      managed_workspace_sheet_provisioned_at: provisionedAt,
       updated_at: new Date().toISOString(),
     }
 
@@ -81,6 +110,8 @@ export async function POST() {
       managed_nutrition_library_sheet_id: workspaceSheet.nutritionLibrarySheetId,
       managed_nutrition_library_sheet_url: workspaceSheet.nutritionLibrarySheetUrl,
       active_modules: currentModules,
+      workspace_status: verifiedHealth.status,
+      missing_artifacts: verifiedHealth.missingArtifacts,
     })
   } catch (error) {
     console.error("Failed to provision Chameleon Sheets", error)
