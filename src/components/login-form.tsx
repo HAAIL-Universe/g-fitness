@@ -13,17 +13,28 @@ export default function LoginForm() {
   const searchParams = useSearchParams()
   const onboarded = searchParams?.get("onboarded")
   const registered = searchParams?.get("registered")
+  const confirmed = searchParams?.get("confirmed")
   const redirect = searchParams?.get("redirect") || "/dashboard"
 
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
+  const [resending, setResending] = useState(false)
   const [error, setError] = useState("")
+  const [notice, setNotice] = useState("")
+
+  function isUnconfirmedUserError(message: string) {
+    const normalized = message.toLowerCase()
+    return normalized.includes("not confirmed")
+      || normalized.includes("email not confirmed")
+      || normalized.includes("user not confirmed")
+  }
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
     setError("")
+    setNotice("")
 
     try {
       const supabase = createClient()
@@ -56,6 +67,40 @@ export default function LoginForm() {
     }
   }
 
+  async function handleResendConfirmation() {
+    if (!email) {
+      setError("Enter your email first so we know where to resend the confirmation link.")
+      return
+    }
+
+    setResending(true)
+    setError("")
+    setNotice("")
+
+    try {
+      const supabase = createClient()
+      const { error: resendError } = await supabase.auth.resend({
+        type: "signup",
+        email,
+        options: {
+          emailRedirectTo: `${window.location.origin}/login?confirmed=true`,
+        },
+      })
+
+      if (resendError) {
+        setError(resendError.message)
+        setResending(false)
+        return
+      }
+
+      setNotice("Confirmation email sent. Check your inbox and then come back to sign in.")
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to resend confirmation email")
+    } finally {
+      setResending(false)
+    }
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center px-6">
       <div className="w-full max-w-sm">
@@ -66,18 +111,13 @@ export default function LoginForm() {
           Coach sign in
         </p>
 
-        <div className="mb-6 rounded-lg border border-gf-border bg-gf-surface p-4 text-sm">
-          <p className="text-white">Coach workspace access</p>
-          <p className="mt-1 text-gf-muted">
-            Coaches create a workspace at <a href="/register/coach" className="text-gf-pink hover:underline">coach signup</a>. Clients join through their invite link and branded portal context.
-          </p>
-        </div>
-
-        {(onboarded || registered) && (
+        {(onboarded || registered || confirmed) && (
           <div className="bg-green-900/20 border border-green-800 rounded-lg p-3 mb-6">
             <p className="text-sm text-green-400 text-center">
-              {registered
-                ? "Account created. Check your email to confirm it, then sign in."
+              {confirmed
+                ? "Email confirmed. Sign in to continue."
+                : registered
+                ? "Coach account created. Sign in to get started."
                 : "Account created. Sign in to get started."}
             </p>
           </div>
@@ -103,6 +143,18 @@ export default function LoginForm() {
             />
 
             {error && <p className="text-sm text-red-400">{error}</p>}
+            {notice && <p className="text-sm text-green-400">{notice}</p>}
+            {error && isUnconfirmedUserError(error) && (
+              <Button
+                type="button"
+                variant="secondary"
+                className="w-full"
+                disabled={resending}
+                onClick={handleResendConfirmation}
+              >
+                {resending ? "Sending confirmation..." : "Resend Confirmation Email"}
+              </Button>
+            )}
 
             <Button type="submit" disabled={loading} className="w-full">
               {loading ? "Logging in..." : "Log In"}

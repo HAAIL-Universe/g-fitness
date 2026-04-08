@@ -30,12 +30,14 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  // Create auth user — email_confirm omitted so Supabase sends a confirmation email
+  // Create and auto-confirm the coach account.
+  // The admin createUser API does not send confirmation emails.
   // app_metadata.role is set at creation time so the callback can self-heal
-  // if the user_roles insert below ever fails
+  // if the user_roles insert below ever fails.
   const { data: authData, error: authError } = await supabase.auth.admin.createUser({
     email,
     password,
+    email_confirm: true,
     user_metadata: { name },
     app_metadata: { role: "coach" },
   })
