@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardTitle } from "@/components/ui/card"
@@ -8,8 +9,11 @@ import { Badge } from "@/components/ui/badge"
 import { Link2, CheckCircle, AlertCircle } from "lucide-react"
 
 export default function SettingsPage() {
+  const searchParams = useSearchParams()
   const [connected, setConnected] = useState<boolean | null>(null)
   const [disconnecting, setDisconnecting] = useState(false)
+  const [connectionMessage, setConnectionMessage] = useState("")
+  const [connectionError, setConnectionError] = useState("")
 
   const [displayName, setDisplayName] = useState("")
   const [businessName, setBusinessName] = useState("")
@@ -21,6 +25,43 @@ export default function SettingsPage() {
     checkConnection()
     fetchProfile()
   }, [])
+
+  useEffect(() => {
+    const connectedParam = searchParams.get("connected")
+    const errorParam = searchParams.get("error")
+
+    if (connectedParam === "true") {
+      setConnectionMessage("Google Sheets connected successfully.")
+      setConnectionError("")
+      return
+    }
+
+    if (!errorParam) {
+      setConnectionMessage("")
+      setConnectionError("")
+      return
+    }
+
+    setConnectionMessage("")
+
+    switch (errorParam) {
+      case "missing_google_env":
+        setConnectionError(
+          "Google OAuth is not configured. Check GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and GOOGLE_REDIRECT_URI."
+        )
+        break
+      case "no_code":
+        setConnectionError(
+          "Google did not return an authorization code. Check the OAuth consent flow and redirect URI."
+        )
+        break
+      default:
+        setConnectionError(
+          "Google connection failed. Check your Google OAuth client, redirect URI, and environment variables, then try again."
+        )
+        break
+    }
+  }, [searchParams])
 
   function checkConnection() {
     fetch("/api/google/connect")
@@ -81,6 +122,24 @@ export default function SettingsPage() {
       <h1 className="text-2xl font-bold mb-2">Settings</h1>
       <p className="text-gf-muted mb-8">Manage your profile and integrations</p>
 
+      {connectionMessage && (
+        <Card className="mb-6 border-green-500/30">
+          <div className="flex items-start gap-2 text-sm text-green-400">
+            <CheckCircle size={16} className="mt-0.5 shrink-0" />
+            <p>{connectionMessage}</p>
+          </div>
+        </Card>
+      )}
+
+      {connectionError && (
+        <Card className="mb-6 border-yellow-500/30">
+          <div className="flex items-start gap-2 text-sm text-yellow-300">
+            <AlertCircle size={16} className="mt-0.5 shrink-0" />
+            <p>{connectionError}</p>
+          </div>
+        </Card>
+      )}
+
       <Card className="mb-6">
         <CardTitle>Profile</CardTitle>
         <p className="text-sm text-gf-muted mt-2 mb-4">
@@ -114,10 +173,10 @@ export default function SettingsPage() {
       </Card>
 
       <Card>
-        <CardTitle>Google Sheets Connection</CardTitle>
+        <CardTitle>Google Sheets + Drive Connection</CardTitle>
         <p className="text-sm text-gf-muted mt-2 mb-4">
-          Connect your Google account so client sheets are created in your
-          Drive and meal plans sync automatically.
+          Connect your Google account so client sheets can be created and stored
+          in your Drive, and meal plans can sync through Google Sheets.
         </p>
 
         <div className="flex items-center justify-between">

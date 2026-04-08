@@ -19,18 +19,29 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    if (
+      !process.env.GOOGLE_CLIENT_ID ||
+      !process.env.GOOGLE_CLIENT_SECRET ||
+      !process.env.GOOGLE_REDIRECT_URI
+    ) {
+      return NextResponse.redirect(
+        new URL("/admin/settings?error=missing_google_env", request.url)
+      )
+    }
+
     const tokens = await exchangeCode(code)
     const admin = createAdmin()
 
     const { data: existing } = await admin
       .from("admin_settings")
-      .select("id")
+      .select("id, google_refresh_token")
       .eq("user_id", user.id)
       .single()
 
     const settingsData = {
       user_id: user.id,
-      google_refresh_token: tokens.refresh_token,
+      google_refresh_token:
+        tokens.refresh_token ?? existing?.google_refresh_token ?? null,
       google_access_token: tokens.access_token,
       google_token_expiry: tokens.expiry_date
         ? new Date(tokens.expiry_date).toISOString()

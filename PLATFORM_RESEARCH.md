@@ -483,8 +483,61 @@ No existing platform offers native two-way Google Sheets integration as a first-
 
 ## Platform Name
 
-> TBD. G-Fitness is the prototype name. New name needed before public launch.
-> Requirements: fitness-adjacent, suggests coaching/guidance, not PT-specific (must work for nutritionists, yoga studios etc.)
+> Chameleon Coach. This replaces G-Fitness as the platform name for public-facing planning and future implementation work.
+> Positioning requirement: broad enough to work across nutrition, PT, wellness, yoga, and studio use cases without sounding locked to a single discipline.
+
+---
+
+## Brand Direction and White-Label Plan
+
+### Product Brand Direction
+- **Chameleon Coach** is the platform brand.
+- The product should be framed as a coach platform that can adapt per coach/business, rather than as a single fixed-brand coaching app.
+- White-labelling should be treated as coach-specific customisation on top of the Chameleon Coach platform, not as fully separate product forks.
+- Default language in future specs and implementation planning should refer to the platform brand first, then the individual coach brand layer where relevant.
+
+### White-Label Strategy
+- White-labelling is per coach account/workspace, with branding settings applied to that coach's client-facing experience.
+- V1 should support lightweight brand customisation without introducing separate deploys, separate codepaths, or tenant-specific builds.
+- The platform brand remains visible on lower tiers via a **Powered by Chameleon Coach** treatment.
+- Higher tiers can progressively reduce or remove visible platform branding later, once the basic custom-brand flow is stable.
+- This strategy should prioritise fast rollout across client-facing surfaces first, before deeper system-wide brand replacement.
+
+### V1 Branding Scope
+- V1 branding fields:
+  - `title`
+  - `logo`
+  - `primary_color`
+  - `accent_color`
+  - `welcome_text`
+- V1 branding should be applied first to:
+  - client-facing portal surfaces
+  - invite flows
+  - onboarding surfaces
+- Admin/internal surfaces do not need full white-label treatment in V1 unless required to support preview/basic setup.
+- V1 should not aim for full email branding, PDF branding, custom domains, or full theme/token systems.
+
+### Later-Phase Branding Scope
+- Later phases may remove platform branding completely for higher tiers.
+- Later phases may add:
+  - branded email templates
+  - branded PDFs / exported reports
+  - custom domains
+  - expanded theme controls / fuller visual theming
+- These should be treated as extensions of the same coach branding model, not separate branding systems.
+
+### Monetization and Tiering Implications
+- White-labelling should reinforce the flat-tier model by gating branding depth by feature tier, not by client count.
+- Lower tiers keep **Powered by Chameleon Coach** visible on branded client-facing experiences.
+- A higher tier can justify removing platform branding and unlocking deeper brand controls.
+- Future premium branding features can be bundled with other higher-tier differentiation such as custom domains and advanced presentation/reporting options.
+
+### Minimal-Diff Implementation Approach
+- Future implementation should aim for minimal diffs across the current product rather than a broad rebrand rewrite.
+- Prefer reusing existing coach settings, profile storage, or equivalent per-coach configuration records where possible instead of introducing a new standalone branding system first.
+- Store branding as a small, coach-scoped settings payload that can safely fall back to Chameleon Coach defaults when unset.
+- Apply branding through shared rendering/configuration paths so the same values can power portal, invite, and onboarding surfaces with minimal duplication.
+- Defer any deeper theme architecture until the limited V1 fields above are working end-to-end.
 
 ---
 
@@ -499,3 +552,4 @@ No existing platform offers native two-way Google Sheets integration as a first-
 | 2026-04-07 | Mindbody/Glofox contract exodus noted as acquisition opportunity for studio owners. |
 | 2026-04-07 | Phase 1 partially complete. Multi-coach, Sheets connection, and meal plan builder done. Remaining: Google Calendar sync, per-session billing, rebrand. |
 | 2026-04-07 | Google Calendar sync and per-session billing deprioritised within Phase 1 — appointment booking works without calendar sync, and subscription billing is sufficient for initial pitches. Decision: assess whether these are needed before cold outreach or can slip to Phase 2. |
+| 2026-04-08 | Platform naming direction set to Chameleon Coach. White-label strategy formalised as coach-level customisation with V1 fields limited to title, logo, primary colour, accent colour, and welcome text; lower tiers retain Powered by Chameleon Coach branding; future implementation should reuse existing coach settings/profile storage with minimal diffs where possible. |
