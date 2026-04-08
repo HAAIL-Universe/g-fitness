@@ -5,10 +5,15 @@ export interface Client {
   name: string
   email: string
   sheet_id: string | null
+  drive_folder_id: string | null
+  drive_folder_url: string | null
   invite_token: string | null
   invite_expires_at: string | null
   invite_accepted_at: string | null
   onboarding_completed: boolean
+  sheet_shared_email: string | null
+  sheet_shared_permission_id: string | null
+  sheet_shared_at: string | null
   created_at: string
   updated_at: string
 }
@@ -62,6 +67,14 @@ export interface AdminSettings {
   active_modules: string[] | null
   managed_workspace_sheet_id: string | null
   managed_workspace_sheet_url: string | null
+  managed_workspace_root_folder_id: string | null
+  managed_workspace_root_folder_url: string | null
+  managed_clients_folder_id: string | null
+  managed_clients_folder_url: string | null
+  managed_pt_library_sheet_id: string | null
+  managed_pt_library_sheet_url: string | null
+  managed_nutrition_library_sheet_id: string | null
+  managed_nutrition_library_sheet_url: string | null
   managed_workspace_sheet_modules: string[] | null
   managed_workspace_sheet_provisioned_at: string | null
   appointment_booking_mode: 'coach_only' | 'client_request_visible_slots' | null

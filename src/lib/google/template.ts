@@ -9,245 +9,813 @@ import {
   type EnableableModule,
 } from "@/lib/modules"
 
-async function ensureDriveFolder(
-  drive: ReturnType<typeof google.drive>,
-  folderName: string
-) {
-  const folderSearch = await drive.files.list({
-    q: `name = '${folderName}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`,
-    fields: "files(id)",
-  })
+const ROOT_FOLDER_NAME = `${PLATFORM_NAME} Workspace`
+const CONTROL_WORKBOOK_NAME = `${PLATFORM_NAME} Workspace Control`
+const CLIENTS_FOLDER_NAME = "Clients"
+const PT_LIBRARY_WORKBOOK_NAME = `${PLATFORM_NAME} PT Library`
+const NUTRITION_LIBRARY_WORKBOOK_NAME = `${PLATFORM_NAME} Nutrition Library`
 
-  if (folderSearch.data.files && folderSearch.data.files.length > 0) {
-    return folderSearch.data.files[0].id!
+type DriveFileRef = {
+  id: string
+  url: string
+}
+
+type CoachWorkspaceMetadata = {
+  managed_workspace_sheet_id?: string | null
+  managed_workspace_sheet_url?: string | null
+  managed_workspace_root_folder_id?: string | null
+  managed_workspace_root_folder_url?: string | null
+  managed_clients_folder_id?: string | null
+  managed_clients_folder_url?: string | null
+  managed_pt_library_sheet_id?: string | null
+  managed_pt_library_sheet_url?: string | null
+  managed_nutrition_library_sheet_id?: string | null
+  managed_nutrition_library_sheet_url?: string | null
+}
+
+type CoachWorkspaceProvisionResult = CoachWorkspaceMetadata & {
+  createdAny: boolean
+}
+
+export type CoachDriveWorkspaceHealth = {
+  status: "healthy" | "missing" | "not_provisioned" | "disconnected"
+  missingArtifacts: string[]
+}
+
+type ClientWorkspaceMetadata = {
+  sheet_id?: string | null
+  drive_folder_id?: string | null
+  drive_folder_url?: string | null
+  sheet_shared_email?: string | null
+  sheet_shared_permission_id?: string | null
+  sheet_shared_at?: string | null
+}
+
+type ClientWorkspaceProvisionResult = ClientWorkspaceMetadata & {
+  sheetId: string
+  sheetUrl: string
+  driveFolderId: string
+  driveFolderUrl: string
+  shared: boolean
+  coachWorkspace: CoachWorkspaceMetadata
+}
+
+function escapeDriveQueryValue(value: string) {
+  return value.replace(/\\/g, "\\\\").replace(/'/g, "\\'")
+}
+
+function spreadsheetUrl(fileId: string) {
+  return `https://docs.google.com/spreadsheets/d/${fileId}/edit`
+}
+
+function folderUrl(fileId: string) {
+  return `https://drive.google.com/drive/folders/${fileId}`
+}
+
+async function lookupDriveFileById(
+  drive: ReturnType<typeof google.drive>,
+  fileId: string | null | undefined
+) {
+  if (!fileId) {
+    return null
   }
 
-  const folder = await drive.files.create({
+  try {
+    const file = await drive.files.get({
+      fileId,
+      fields: "id, mimeType, webViewLink",
+    })
+
+    if (!file.data.id) {
+      return null
+    }
+
+    return {
+      id: file.data.id,
+      url:
+        file.data.webViewLink
+        || (file.data.mimeType === "application/vnd.google-apps.folder"
+          ? folderUrl(file.data.id)
+          : spreadsheetUrl(file.data.id)),
+    }
+  } catch {
+    return null
+  }
+}
+
+async function findDriveFileByName(
+  drive: ReturnType<typeof google.drive>,
+  {
+    name,
+    mimeType,
+    parentId,
+  }: {
+    name: string
+    mimeType: string
+    parentId?: string | null
+  }
+) {
+  const parentClause = parentId ? ` and '${escapeDriveQueryValue(parentId)}' in parents` : ""
+  const fileSearch = await drive.files.list({
+    q: `name = '${escapeDriveQueryValue(name)}' and mimeType = '${mimeType}' and trashed = false${parentClause}`,
+    fields: "files(id, webViewLink)",
+    orderBy: "createdTime",
+    pageSize: 1,
+  })
+
+  const file = fileSearch.data.files?.[0]
+  if (!file?.id) {
+    return null
+  }
+
+  return {
+    id: file.id,
+    url:
+      file.webViewLink
+      || (mimeType === "application/vnd.google-apps.folder" ? folderUrl(file.id) : spreadsheetUrl(file.id)),
+  }
+}
+
+async function createDriveFile(
+  drive: ReturnType<typeof google.drive>,
+  {
+    name,
+    mimeType,
+    parentId,
+  }: {
+    name: string
+    mimeType: string
+    parentId?: string | null
+  }
+) {
+  const file = await drive.files.create({
     requestBody: {
-      name: folderName,
-      mimeType: "application/vnd.google-apps.folder",
+      name,
+      mimeType,
+      ...(parentId ? { parents: [parentId] } : {}),
+    },
+    fields: "id, webViewLink",
+  })
+
+  const fileId = file.data.id
+  if (!fileId) {
+    throw new Error(`Failed to create ${name} in Google Drive.`)
+  }
+
+  return {
+    id: fileId,
+    url:
+      file.data.webViewLink
+      || (mimeType === "application/vnd.google-apps.folder" ? folderUrl(fileId) : spreadsheetUrl(fileId)),
+  }
+}
+
+async function ensureDriveFolder(
+  drive: ReturnType<typeof google.drive>,
+  {
+    folderName,
+    parentId,
+    existingId,
+  }: {
+    folderName: string
+    parentId?: string | null
+    existingId?: string | null
+  }
+) {
+  const existing = await lookupDriveFileById(drive, existingId)
+  if (existing) {
+    return { ...existing, created: false }
+  }
+
+  const found = await findDriveFileByName(drive, {
+    name: folderName,
+    mimeType: "application/vnd.google-apps.folder",
+    parentId,
+  })
+  if (found) {
+    return { ...found, created: false }
+  }
+
+  const created = await createDriveFile(drive, {
+    name: folderName,
+    mimeType: "application/vnd.google-apps.folder",
+    parentId,
+  })
+  return { ...created, created: true }
+}
+
+async function ensureSpreadsheetFile(
+  drive: ReturnType<typeof google.drive>,
+  {
+    fileName,
+    parentId,
+    existingId,
+  }: {
+    fileName: string
+    parentId: string
+    existingId?: string | null
+  }
+) {
+  const existing = await lookupDriveFileById(drive, existingId)
+  if (existing) {
+    return { ...existing, created: false }
+  }
+
+  const found = await findDriveFileByName(drive, {
+    name: fileName,
+    mimeType: "application/vnd.google-apps.spreadsheet",
+    parentId,
+  })
+  if (found) {
+    return { ...found, created: false }
+  }
+
+  const created = await createDriveFile(drive, {
+    name: fileName,
+    mimeType: "application/vnd.google-apps.spreadsheet",
+    parentId,
+  })
+  return { ...created, created: true }
+}
+
+async function getSheetTitles(
+  sheets: ReturnType<typeof google.sheets>,
+  spreadsheetId: string
+) {
+  const spreadsheet = await sheets.spreadsheets.get({
+    spreadsheetId,
+    fields: "sheets.properties.title",
+  })
+
+  return new Set(
+    (spreadsheet.data.sheets ?? [])
+      .map((sheet) => sheet.properties?.title)
+      .filter((title): title is string => Boolean(title))
+  )
+}
+
+async function ensureSpreadsheetTabs(
+  sheets: ReturnType<typeof google.sheets>,
+  spreadsheetId: string,
+  tabTitles: string[]
+) {
+  const existingTitles = await getSheetTitles(sheets, spreadsheetId)
+  const addSheetRequests = tabTitles
+    .filter((title) => !existingTitles.has(title))
+    .map((title) => ({
+      addSheet: {
+        properties: {
+          title,
+        },
+      },
+    }))
+
+  if (addSheetRequests.length > 0) {
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId,
+      requestBody: {
+        requests: addSheetRequests,
+      },
+    })
+  }
+}
+
+async function updateValues(
+  sheets: ReturnType<typeof google.sheets>,
+  spreadsheetId: string,
+  range: string,
+  values: string[][]
+) {
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range,
+    valueInputOption: "USER_ENTERED",
+    requestBody: {
+      values,
+    },
+  })
+}
+
+async function ensureControlWorkbookContent(
+  sheets: ReturnType<typeof google.sheets>,
+  spreadsheetId: string,
+  {
+    coachTypePreset,
+    activeModules,
+  }: {
+    coachTypePreset: CoachTypePreset | null
+    activeModules: EnableableModule[]
+  }
+) {
+  const moduleTitles = activeModules.map((module) => MODULE_LABELS[module])
+  await ensureSpreadsheetTabs(sheets, spreadsheetId, [
+    "Workspace Guide",
+    "Module Catalog",
+    "Client Index",
+  ])
+
+  await updateValues(sheets, spreadsheetId, "Workspace Guide!A1:B8", [
+    ["Status", "Provisioned"],
+    ["Coach preset", coachTypePreset ? COACH_TYPE_LABELS[coachTypePreset] : "Legacy workspace"],
+    ["Active modules", moduleTitles.join(", ") || "Shared core only"],
+    ["Control workbook role", "Workspace control plane only"],
+    ["Client data location", "Client-specific records live in per-client workbooks"],
+    ["Coach library location", "Coach-scoped libraries live in separate private workbooks"],
+    ["Provisioning rule", "Chameleon reuses this workspace and creates client folders/workbooks on demand"],
+    ["Source of truth", "Chameleon-managed Google files in the coach-owned Drive workspace"],
+  ])
+
+  await updateValues(sheets, spreadsheetId, `Module Catalog!A1:D${activeModules.length + 2}`, [
+    ["Module", "Status", "Scope", "Notes"],
+    ["Shared Core", "Enabled", "Workspace + client", "Base workspace surfaces and client workbooks"],
+    ...activeModules.map((module) => [
+      MODULE_LABELS[module],
+      "Enabled",
+      "Coach library",
+      module === "pt_core"
+        ? "Separate PT library workbook provisioned when active"
+        : "Separate nutrition library workbook provisioned when active",
+    ]),
+  ])
+
+  await updateValues(sheets, spreadsheetId, "Client Index!A1:F2", [
+    ["Client ID", "Client Name", "Client Email", "Folder URL", "Workbook URL", "Sharing Status"],
+    ["", "", "", "", "", ""],
+  ])
+}
+
+async function ensurePtLibraryWorkbookContent(
+  sheets: ReturnType<typeof google.sheets>,
+  spreadsheetId: string
+) {
+  await ensureSpreadsheetTabs(sheets, spreadsheetId, ["Exercise Library"])
+  await updateValues(sheets, spreadsheetId, "Exercise Library!A1:E2", [
+    ["Name", "Category", "Description", "Coaching Notes", "Media URL"],
+    ["", "", "", "", ""],
+  ])
+}
+
+async function ensureNutritionLibraryWorkbookContent(
+  sheets: ReturnType<typeof google.sheets>,
+  spreadsheetId: string
+) {
+  await ensureSpreadsheetTabs(sheets, spreadsheetId, ["Recipe Library"])
+  await updateValues(sheets, spreadsheetId, "Recipe Library!A1:D2", [
+    ["Recipe Name", "Category", "Ingredients", "Notes"],
+    ["", "", "", ""],
+  ])
+}
+
+async function ensureClientWorkbookContent(
+  sheets: ReturnType<typeof google.sheets>,
+  spreadsheetId: string,
+  {
+    clientEmail,
+    onboarding,
+  }: {
+    clientEmail: string
+    onboarding: OnboardingData
+  }
+) {
+  await ensureSpreadsheetTabs(sheets, spreadsheetId, ["Profile", "Meal Plan", "Progress"])
+
+  await updateValues(sheets, spreadsheetId, "Profile!A1:B12", [
+    ["Name", onboarding.name],
+    ["Email", clientEmail],
+    ["Age", String(onboarding.age)],
+    ["Gender", onboarding.gender],
+    ["Height", onboarding.height],
+    ["Current weight", onboarding.current_weight],
+    ["Goal weight", onboarding.goal_weight],
+    ["Fitness goals", onboarding.fitness_goals],
+    ["Dietary restrictions", onboarding.dietary_restrictions],
+    ["Health conditions", onboarding.health_conditions],
+    ["Activity level", onboarding.activity_level.replace(/_/g, " ")],
+    ["Notes", onboarding.notes],
+  ])
+
+  await updateValues(sheets, spreadsheetId, "Meal Plan!A1:E8", [
+    ["Day", "Breakfast", "Lunch", "Dinner", "Snacks"],
+    ["Monday", "", "", "", ""],
+    ["Tuesday", "", "", "", ""],
+    ["Wednesday", "", "", "", ""],
+    ["Thursday", "", "", "", ""],
+    ["Friday", "", "", "", ""],
+    ["Saturday", "", "", "", ""],
+    ["Sunday", "", "", "", ""],
+  ])
+
+  await updateValues(sheets, spreadsheetId, "Progress!A1:D1", [
+    ["Date", "Weight", "Measurements", "Notes"],
+  ])
+}
+
+async function upsertClientIndexRow(
+  sheets: ReturnType<typeof google.sheets>,
+  spreadsheetId: string,
+  {
+    clientId,
+    clientName,
+    clientEmail,
+    folderUrl,
+    workbookUrl,
+    sharingStatus,
+  }: {
+    clientId: string
+    clientName: string
+    clientEmail: string
+    folderUrl: string
+    workbookUrl: string
+    sharingStatus: string
+  }
+) {
+  const rows = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: "Client Index!A:F",
+  })
+
+  const values = rows.data.values ?? []
+  let rowIndex = values.findIndex((row, index) => index > 0 && row[0] === clientId)
+  if (rowIndex === -1) {
+    rowIndex = values.length > 1 ? values.length : 1
+  }
+
+  const sheetRow = rowIndex + 1
+  await updateValues(sheets, spreadsheetId, `Client Index!A${sheetRow}:F${sheetRow}`, [
+    [clientId, clientName, clientEmail, folderUrl, workbookUrl, sharingStatus],
+  ])
+}
+
+async function ensureWriterPermission(
+  drive: ReturnType<typeof google.drive>,
+  fileId: string,
+  email: string,
+  existingPermissionId?: string | null
+) {
+  if (existingPermissionId) {
+    try {
+      const existing = await drive.permissions.get({
+        fileId,
+        permissionId: existingPermissionId,
+        fields: "id, emailAddress, role, type",
+      })
+
+      if (
+        existing.data.id
+        && existing.data.type === "user"
+        && existing.data.emailAddress?.toLowerCase() === email.toLowerCase()
+        && (existing.data.role === "writer" || existing.data.role === "owner")
+      ) {
+        return {
+          permissionId: existing.data.id,
+          created: false,
+        }
+      }
+    } catch {
+      // fall back to listing and/or creating the permission again
+    }
+  }
+
+  const permissions = await drive.permissions.list({
+    fileId,
+    fields: "permissions(id,emailAddress,role,type)",
+  })
+
+  const existingByEmail = permissions.data.permissions?.find(
+    (permission) =>
+      permission.type === "user"
+      && permission.emailAddress?.toLowerCase() === email.toLowerCase()
+      && (permission.role === "writer" || permission.role === "owner")
+  )
+
+  if (existingByEmail?.id) {
+    return {
+      permissionId: existingByEmail.id,
+      created: false,
+    }
+  }
+
+  const created = await drive.permissions.create({
+    fileId,
+    sendNotificationEmail: true,
+    requestBody: {
+      type: "user",
+      role: "writer",
+      emailAddress: email,
     },
     fields: "id",
   })
 
-  return folder.data.id!
+  if (!created.data.id) {
+    throw new Error(`Failed to share Google workbook with ${email}.`)
+  }
+
+  return {
+    permissionId: created.data.id,
+    created: true,
+  }
 }
 
-async function moveFileToFolder(
-  drive: ReturnType<typeof google.drive>,
-  fileId: string,
-  folderId: string
-) {
-  const file = await drive.files.get({
-    fileId,
-    fields: "parents",
-  })
-
-  await drive.files.update({
-    fileId,
-    addParents: folderId,
-    removeParents: file.data.parents?.join(",") || "",
-    fields: "id, webViewLink",
-  })
+function buildClientFolderName(clientId: string, clientName: string) {
+  return `${clientName} (${clientId.slice(0, 8)})`
 }
 
-export async function createClientSheet(
-  clientName: string,
-  onboarding: OnboardingData,
+function buildClientWorkbookName(clientName: string) {
+  return `${PLATFORM_NAME} - ${clientName}`
+}
+
+export async function getCoachDriveWorkspaceHealth({
+  coachId,
+  activeModules,
+  settings,
+}: {
   coachId: string
-): Promise<string> {
+  activeModules: EnableableModule[]
+  settings?: (CoachWorkspaceMetadata & {
+    google_refresh_token?: string | null
+    managed_workspace_sheet_modules?: string[] | null
+    managed_workspace_sheet_provisioned_at?: string | null
+  }) | null
+}): Promise<CoachDriveWorkspaceHealth> {
+  if (!settings?.google_refresh_token) {
+    return {
+      status: "disconnected",
+      missingArtifacts: [],
+    }
+  }
+
+  const hasProvisioningMetadata =
+    !!settings.managed_workspace_root_folder_id
+    && !!settings.managed_workspace_sheet_id
+    && !!settings.managed_clients_folder_id
+    && !!settings.managed_workspace_sheet_provisioned_at
+
+  if (!hasProvisioningMetadata) {
+    return {
+      status: "not_provisioned",
+      missingArtifacts: [],
+    }
+  }
+
+  const auth = await getAuthedClient(coachId)
+  const drive = google.drive({ version: "v3", auth })
+  const missingArtifacts: string[] = []
+
+  const rootFolder = await lookupDriveFileById(drive, settings.managed_workspace_root_folder_id)
+  if (!rootFolder) {
+    missingArtifacts.push("workspace_root_folder")
+  }
+
+  const controlWorkbook = await lookupDriveFileById(drive, settings.managed_workspace_sheet_id)
+  if (!controlWorkbook) {
+    missingArtifacts.push("workspace_control_workbook")
+  }
+
+  const clientsFolder = await lookupDriveFileById(drive, settings.managed_clients_folder_id)
+  if (!clientsFolder) {
+    missingArtifacts.push("clients_folder")
+  }
+
+  if (activeModules.includes("pt_core")) {
+    const ptLibrary = await lookupDriveFileById(drive, settings.managed_pt_library_sheet_id)
+    if (!ptLibrary) {
+      missingArtifacts.push("pt_library_workbook")
+    }
+  }
+
+  if (activeModules.includes("nutrition_core")) {
+    const nutritionLibrary = await lookupDriveFileById(
+      drive,
+      settings.managed_nutrition_library_sheet_id
+    )
+    if (!nutritionLibrary) {
+      missingArtifacts.push("nutrition_library_workbook")
+    }
+  }
+
+  return {
+    status: missingArtifacts.length > 0 ? "missing" : "healthy",
+    missingArtifacts,
+  }
+}
+
+export async function ensureCoachDriveWorkspace({
+  coachId,
+  coachTypePreset,
+  activeModules,
+  existing,
+}: {
+  coachId: string
+  coachTypePreset: CoachTypePreset | null
+  activeModules: EnableableModule[]
+  existing?: CoachWorkspaceMetadata | null
+}): Promise<CoachWorkspaceProvisionResult> {
   const auth = await getAuthedClient(coachId)
   const sheets = google.sheets({ version: "v4", auth })
   const drive = google.drive({ version: "v3", auth })
 
-  // Create the spreadsheet
-  const spreadsheet = await sheets.spreadsheets.create({
-    requestBody: {
-      properties: {
-        title: `${PLATFORM_NAME} — ${clientName}`,
-      },
-      sheets: [
-        { properties: { title: "Profile", index: 0 } },
-        { properties: { title: "Meal Plan", index: 1 } },
-        { properties: { title: "Progress", index: 2 } },
-      ],
-    },
+  let createdAny = false
+
+  const rootFolder = await ensureDriveFolder(drive, {
+    folderName: ROOT_FOLDER_NAME,
+    parentId: "root",
+    existingId: existing?.managed_workspace_root_folder_id,
+  })
+  createdAny = createdAny || rootFolder.created
+
+  const controlWorkbook = await ensureSpreadsheetFile(drive, {
+    fileName: CONTROL_WORKBOOK_NAME,
+    parentId: rootFolder.id,
+    existingId: existing?.managed_workspace_sheet_id,
+  })
+  createdAny = createdAny || controlWorkbook.created
+  await ensureControlWorkbookContent(sheets, controlWorkbook.id, {
+    coachTypePreset,
+    activeModules,
   })
 
-  const sheetId = spreadsheet.data.spreadsheetId!
-
-  // Fill Profile tab with onboarding data
-  await sheets.spreadsheets.values.update({
-    spreadsheetId: sheetId,
-    range: "Profile!A1:B12",
-    valueInputOption: "USER_ENTERED",
-    requestBody: {
-      values: [
-        ["Name", onboarding.name],
-        ["Email", ""],
-        ["Age", String(onboarding.age)],
-        ["Gender", onboarding.gender],
-        ["Height", onboarding.height],
-        ["Current weight", onboarding.current_weight],
-        ["Goal weight", onboarding.goal_weight],
-        ["Fitness goals", onboarding.fitness_goals],
-        ["Dietary restrictions", onboarding.dietary_restrictions],
-        ["Health conditions", onboarding.health_conditions],
-        ["Activity level", onboarding.activity_level.replace(/_/g, " ")],
-        ["Notes", onboarding.notes],
-      ],
-    },
+  const clientsFolder = await ensureDriveFolder(drive, {
+    folderName: CLIENTS_FOLDER_NAME,
+    parentId: rootFolder.id,
+    existingId: existing?.managed_clients_folder_id,
   })
+  createdAny = createdAny || clientsFolder.created
 
-  // Set up Meal Plan headers
-  await sheets.spreadsheets.values.update({
-    spreadsheetId: sheetId,
-    range: "Meal Plan!A1:E8",
-    valueInputOption: "USER_ENTERED",
-    requestBody: {
-      values: [
-        ["Day", "Breakfast", "Lunch", "Dinner", "Snacks"],
-        ["Monday", "", "", "", ""],
-        ["Tuesday", "", "", "", ""],
-        ["Wednesday", "", "", "", ""],
-        ["Thursday", "", "", "", ""],
-        ["Friday", "", "", "", ""],
-        ["Saturday", "", "", "", ""],
-        ["Sunday", "", "", "", ""],
-      ],
-    },
-  })
+  let ptLibrarySheetId = existing?.managed_pt_library_sheet_id ?? null
+  let ptLibrarySheetUrl = existing?.managed_pt_library_sheet_url ?? null
+  if (activeModules.includes("pt_core")) {
+    const ptLibrary = await ensureSpreadsheetFile(drive, {
+      fileName: PT_LIBRARY_WORKBOOK_NAME,
+      parentId: rootFolder.id,
+      existingId: existing?.managed_pt_library_sheet_id,
+    })
+    createdAny = createdAny || ptLibrary.created
+    await ensurePtLibraryWorkbookContent(sheets, ptLibrary.id)
+    ptLibrarySheetId = ptLibrary.id
+    ptLibrarySheetUrl = ptLibrary.url
+  }
 
-  // Set up Progress headers
-  await sheets.spreadsheets.values.update({
-    spreadsheetId: sheetId,
-    range: "Progress!A1:D1",
-    valueInputOption: "USER_ENTERED",
-    requestBody: {
-      values: [["Date", "Weight", "Measurements", "Notes"]],
-    },
-  })
+  let nutritionLibrarySheetId = existing?.managed_nutrition_library_sheet_id ?? null
+  let nutritionLibrarySheetUrl = existing?.managed_nutrition_library_sheet_url ?? null
+  if (activeModules.includes("nutrition_core")) {
+    const nutritionLibrary = await ensureSpreadsheetFile(drive, {
+      fileName: NUTRITION_LIBRARY_WORKBOOK_NAME,
+      parentId: rootFolder.id,
+      existingId: existing?.managed_nutrition_library_sheet_id,
+    })
+    createdAny = createdAny || nutritionLibrary.created
+    await ensureNutritionLibraryWorkbookContent(sheets, nutritionLibrary.id)
+    nutritionLibrarySheetId = nutritionLibrary.id
+    nutritionLibrarySheetUrl = nutritionLibrary.url
+  }
 
-  // Move to a platform folder in coach's Drive, create if it doesn't exist
-  const folderId = await ensureDriveFolder(drive, `${PLATFORM_NAME} Clients`)
-  await moveFileToFolder(drive, sheetId, folderId)
-
-  return sheetId
+  return {
+    createdAny,
+    managed_workspace_sheet_id: controlWorkbook.id,
+    managed_workspace_sheet_url: controlWorkbook.url,
+    managed_workspace_root_folder_id: rootFolder.id,
+    managed_workspace_root_folder_url: rootFolder.url,
+    managed_clients_folder_id: clientsFolder.id,
+    managed_clients_folder_url: clientsFolder.url,
+    managed_pt_library_sheet_id: ptLibrarySheetId,
+    managed_pt_library_sheet_url: ptLibrarySheetUrl,
+    managed_nutrition_library_sheet_id: nutritionLibrarySheetId,
+    managed_nutrition_library_sheet_url: nutritionLibrarySheetUrl,
+  }
 }
 
 export async function createCoachWorkspaceSheet({
   coachId,
   coachTypePreset,
   activeModules,
+  existing,
 }: {
   coachId: string
   coachTypePreset: CoachTypePreset | null
   activeModules: EnableableModule[]
+  existing?: CoachWorkspaceMetadata | null
 }) {
+  const workspace = await ensureCoachDriveWorkspace({
+    coachId,
+    coachTypePreset,
+    activeModules,
+    existing,
+  })
+
+  return {
+    createdAny: workspace.createdAny,
+    sheetId: workspace.managed_workspace_sheet_id!,
+    sheetUrl: workspace.managed_workspace_sheet_url!,
+    rootFolderId: workspace.managed_workspace_root_folder_id!,
+    rootFolderUrl: workspace.managed_workspace_root_folder_url!,
+    clientsFolderId: workspace.managed_clients_folder_id!,
+    clientsFolderUrl: workspace.managed_clients_folder_url!,
+    ptLibrarySheetId: workspace.managed_pt_library_sheet_id ?? null,
+    ptLibrarySheetUrl: workspace.managed_pt_library_sheet_url ?? null,
+    nutritionLibrarySheetId: workspace.managed_nutrition_library_sheet_id ?? null,
+    nutritionLibrarySheetUrl: workspace.managed_nutrition_library_sheet_url ?? null,
+  }
+}
+
+export async function createClientSheet({
+  clientId,
+  clientName,
+  clientEmail,
+  onboarding,
+  coachId,
+  coachTypePreset,
+  activeModules,
+  coachWorkspace,
+  clientWorkspace,
+  shareWithClient,
+}: {
+  clientId: string
+  clientName: string
+  clientEmail: string
+  onboarding: OnboardingData
+  coachId: string
+  coachTypePreset: CoachTypePreset | null
+  activeModules: EnableableModule[]
+  coachWorkspace?: CoachWorkspaceMetadata | null
+  clientWorkspace?: ClientWorkspaceMetadata | null
+  shareWithClient?: boolean
+}): Promise<ClientWorkspaceProvisionResult> {
   const auth = await getAuthedClient(coachId)
   const sheets = google.sheets({ version: "v4", auth })
   const drive = google.drive({ version: "v3", auth })
 
-  const moduleTitles = activeModules.map((module) => MODULE_LABELS[module])
-  const spreadsheet = await sheets.spreadsheets.create({
-    requestBody: {
-      properties: {
-        title: `${PLATFORM_NAME} Workspace`,
-      },
-      sheets: [
-        { properties: { title: "Workspace Guide", index: 0 } },
-        { properties: { title: "Module Catalog", index: 1 } },
-        ...(activeModules.includes("pt_core")
-          ? [{ properties: { title: "Exercise Library", index: 2 } }]
-          : []),
-        ...(activeModules.includes("nutrition_core")
-          ? [
-              {
-                properties: {
-                  title: "Recipe Library",
-                  index: activeModules.includes("pt_core") ? 3 : 2,
-                },
-              },
-            ]
-          : []),
-      ],
-    },
-    fields: "spreadsheetId,spreadsheetUrl",
+  const workspace = await ensureCoachDriveWorkspace({
+    coachId,
+    coachTypePreset,
+    activeModules,
+    existing: coachWorkspace,
   })
 
-  const sheetId = spreadsheet.data.spreadsheetId!
-  const sheetUrl =
-    spreadsheet.data.spreadsheetUrl || `https://docs.google.com/spreadsheets/d/${sheetId}/edit`
-
-  await sheets.spreadsheets.values.update({
-    spreadsheetId: sheetId,
-    range: "Workspace Guide!A1:B6",
-    valueInputOption: "USER_ENTERED",
-    requestBody: {
-      values: [
-        ["Status", "Provisioned"],
-        ["Coach preset", coachTypePreset ? COACH_TYPE_LABELS[coachTypePreset] : "Legacy workspace"],
-        ["Active modules", moduleTitles.join(", ") || "Shared core only"],
-        ["Connection", "Google is connected and ready for Chameleon-managed sheets"],
-        ["Next step", "Use this workspace sheet as the starter managed structure in your Google Drive"],
-        ["Source of truth", "Chameleon-managed sheets live in your Google account"],
-      ],
-    },
+  const clientFolder = await ensureDriveFolder(drive, {
+    folderName: buildClientFolderName(clientId, clientName),
+    parentId: workspace.managed_clients_folder_id!,
+    existingId: clientWorkspace?.drive_folder_id,
   })
 
-  await sheets.spreadsheets.values.update({
-    spreadsheetId: sheetId,
-    range: `Module Catalog!A1:D${activeModules.length + 2}`,
-    valueInputOption: "USER_ENTERED",
-    requestBody: {
-      values: [
-        ["Module", "Status", "Scope", "Notes"],
-        ["Shared Core", "Enabled", "Coach + client", "Base workspace surfaces"],
-        ...activeModules.map((module) => [
-          MODULE_LABELS[module],
-          "Enabled",
-          "Coach",
-          module === "pt_core"
-            ? "Starter exercise library structure provisioned"
-            : "Starter recipe library structure provisioned",
-        ]),
-      ],
-    },
+  const clientWorkbook = await ensureSpreadsheetFile(drive, {
+    fileName: buildClientWorkbookName(clientName),
+    parentId: clientFolder.id,
+    existingId: clientWorkspace?.sheet_id,
   })
 
-  if (activeModules.includes("pt_core")) {
-    await sheets.spreadsheets.values.update({
-      spreadsheetId: sheetId,
-      range: "Exercise Library!A1:E2",
-      valueInputOption: "USER_ENTERED",
-      requestBody: {
-        values: [
-          ["Name", "Category", "Description", "Coaching Notes", "Media URL"],
-          ["", "", "", "", ""],
-        ],
-      },
-    })
+  await ensureClientWorkbookContent(sheets, clientWorkbook.id, {
+    clientEmail,
+    onboarding,
+  })
+
+  let permissionId = clientWorkspace?.sheet_shared_permission_id ?? null
+  let sharedAt = clientWorkspace?.sheet_shared_at ?? null
+  let shared = false
+
+  if (shareWithClient) {
+    const permission = await ensureWriterPermission(
+      drive,
+      clientWorkbook.id,
+      clientEmail,
+      clientWorkspace?.sheet_shared_permission_id
+    )
+    permissionId = permission.permissionId
+    sharedAt = clientWorkspace?.sheet_shared_at ?? new Date().toISOString()
+    shared = true
   }
 
-  if (activeModules.includes("nutrition_core")) {
-    await sheets.spreadsheets.values.update({
-      spreadsheetId: sheetId,
-      range: "Recipe Library!A1:D2",
-      valueInputOption: "USER_ENTERED",
-      requestBody: {
-        values: [
-          ["Recipe Name", "Category", "Ingredients", "Notes"],
-          ["", "", "", ""],
-        ],
-      },
-    })
-  }
-
-  const folderId = await ensureDriveFolder(drive, `${PLATFORM_NAME} Workspace`)
-  await moveFileToFolder(drive, sheetId, folderId)
+  await upsertClientIndexRow(sheets, workspace.managed_workspace_sheet_id!, {
+    clientId,
+    clientName,
+    clientEmail,
+    folderUrl: clientFolder.url,
+    workbookUrl: clientWorkbook.url,
+    sharingStatus: shared ? `Workbook shared with ${clientEmail}` : "Provisioned, not shared",
+  })
 
   return {
-    sheetId,
-    sheetUrl,
+    sheetId: clientWorkbook.id,
+    sheetUrl: clientWorkbook.url,
+    driveFolderId: clientFolder.id,
+    driveFolderUrl: clientFolder.url,
+    shared,
+    coachWorkspace: {
+      managed_workspace_sheet_id: workspace.managed_workspace_sheet_id,
+      managed_workspace_sheet_url: workspace.managed_workspace_sheet_url,
+      managed_workspace_root_folder_id: workspace.managed_workspace_root_folder_id,
+      managed_workspace_root_folder_url: workspace.managed_workspace_root_folder_url,
+      managed_clients_folder_id: workspace.managed_clients_folder_id,
+      managed_clients_folder_url: workspace.managed_clients_folder_url,
+      managed_pt_library_sheet_id: workspace.managed_pt_library_sheet_id,
+      managed_pt_library_sheet_url: workspace.managed_pt_library_sheet_url,
+      managed_nutrition_library_sheet_id: workspace.managed_nutrition_library_sheet_id,
+      managed_nutrition_library_sheet_url: workspace.managed_nutrition_library_sheet_url,
+    },
+    drive_folder_id: clientFolder.id,
+    drive_folder_url: clientFolder.url,
+    sheet_id: clientWorkbook.id,
+    sheet_shared_email: shared ? clientEmail : clientWorkspace?.sheet_shared_email ?? null,
+    sheet_shared_permission_id: permissionId,
+    sheet_shared_at: sharedAt,
   }
 }

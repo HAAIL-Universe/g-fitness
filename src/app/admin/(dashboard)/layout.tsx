@@ -1,12 +1,40 @@
 import { AdminNav } from "@/components/layout/admin-nav"
+import { createClient, createAdmin } from "@/lib/supabase/server"
+import { resolveActiveModules } from "@/lib/modules"
+import { getCoachDriveWorkspaceHealth } from "@/lib/google/template"
 
 export const dynamic = 'force-dynamic'
 
-export default function AdminLayout({
+export default async function AdminLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (user) {
+    const admin = createAdmin()
+    const { data: settings } = await admin
+      .from("admin_settings")
+      .select("google_refresh_token, active_modules, coach_type_preset, managed_workspace_sheet_id, managed_workspace_sheet_url, managed_workspace_sheet_modules, managed_workspace_sheet_provisioned_at, managed_workspace_root_folder_id, managed_workspace_root_folder_url, managed_clients_folder_id, managed_clients_folder_url, managed_pt_library_sheet_id, managed_pt_library_sheet_url, managed_nutrition_library_sheet_id, managed_nutrition_library_sheet_url")
+      .eq("user_id", user.id)
+      .maybeSingle()
+
+    if (settings?.google_refresh_token) {
+      const modules = resolveActiveModules(settings)
+      try {
+        await getCoachDriveWorkspaceHealth({
+          coachId: user.id,
+          activeModules: modules.enableable_modules,
+          settings,
+        })
+      } catch {
+        // Ignore background health-check failures here; the settings route reports the live state.
+      }
+    }
+  }
+
   return (
     <div className="flex min-h-screen">
       <AdminNav />

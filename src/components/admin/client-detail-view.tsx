@@ -50,6 +50,7 @@ export function ClientDetailView({
   const sheetUrl = client.sheet_id
     ? `https://docs.google.com/spreadsheets/d/${client.sheet_id}`
     : null
+  const folderUrl = client.drive_folder_url
   const workspaceSections = [
     { id: "overview", label: "Overview", enabled: canAccessFeature("client_overview", activeModules) },
     { id: "meal-plan", label: "Meal Plan", enabled: canAccessFeature("client_meal_plan", activeModules) },
@@ -238,10 +239,39 @@ export function ClientDetailView({
                     </p>
                   </div>
                   <div>
+                    <p className="text-xs text-gf-muted">Client folder</p>
+                    <p className="mt-0.5 text-sm text-white">
+                      {folderUrl ? "Provisioned" : "Not provisioned"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gf-muted">Workbook sharing</p>
+                    <p className="mt-0.5 text-sm text-white">
+                      {client.sheet_shared_at ? "Granted" : "Private"}
+                    </p>
+                  </div>
+                  <div>
                     <p className="text-xs text-gf-muted">Client sections</p>
                     <p className="mt-0.5 text-sm text-white">{workspaceSections.length}</p>
                   </div>
                 </div>
+                {(folderUrl || client.sheet_shared_email) && (
+                  <div className="mt-4 flex flex-wrap gap-4 text-sm text-gf-muted">
+                    {folderUrl ? (
+                      <a
+                        href={folderUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-gf-pink hover:text-gf-pink-light transition-colors"
+                      >
+                        Open client folder
+                      </a>
+                    ) : null}
+                    {client.sheet_shared_email ? (
+                      <p>Shared workbook access: {client.sheet_shared_email}</p>
+                    ) : null}
+                  </div>
+                )}
                 <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {[
                     { label: "Age", value: profile.age },

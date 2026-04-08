@@ -16,7 +16,7 @@ export async function POST() {
   const admin = createAdmin()
   const { data: settings } = await admin
     .from("admin_settings")
-    .select("id, user_id, google_refresh_token, coach_type_preset, active_modules, managed_workspace_sheet_id, managed_workspace_sheet_url, managed_workspace_sheet_modules, managed_workspace_sheet_provisioned_at")
+    .select("id, user_id, google_refresh_token, coach_type_preset, active_modules, managed_workspace_sheet_id, managed_workspace_sheet_url, managed_workspace_sheet_modules, managed_workspace_sheet_provisioned_at, managed_workspace_root_folder_id, managed_workspace_root_folder_url, managed_clients_folder_id, managed_clients_folder_url, managed_pt_library_sheet_id, managed_pt_library_sheet_url, managed_nutrition_library_sheet_id, managed_nutrition_library_sheet_url")
     .eq("user_id", user.id)
     .maybeSingle()
 
@@ -29,36 +29,26 @@ export async function POST() {
 
   const modules = resolveActiveModules(settings)
   const currentModules = modules.enableable_modules
-  const provisionedModules = normalizeActiveModules(
-    settings.managed_workspace_sheet_modules
-  )
-  const alreadyProvisioned =
-    !!settings.managed_workspace_sheet_id
-    && !!settings.managed_workspace_sheet_provisioned_at
-    && provisionedModules.length === currentModules.length
-    && currentModules.every((module) => provisionedModules.includes(module))
-
-  if (alreadyProvisioned) {
-    return NextResponse.json({
-      ok: true,
-      already_provisioned: true,
-      managed_workspace_sheet_id: settings.managed_workspace_sheet_id,
-      managed_workspace_sheet_url: settings.managed_workspace_sheet_url,
-      active_modules: currentModules,
-    })
-  }
-
   try {
     const workspaceSheet = await createCoachWorkspaceSheet({
       coachId: user.id,
       coachTypePreset: normalizeCoachTypePreset(settings.coach_type_preset),
       activeModules: currentModules,
+      existing: settings,
     })
 
     const updatePayload = {
       user_id: user.id,
       managed_workspace_sheet_id: workspaceSheet.sheetId,
       managed_workspace_sheet_url: workspaceSheet.sheetUrl,
+      managed_workspace_root_folder_id: workspaceSheet.rootFolderId,
+      managed_workspace_root_folder_url: workspaceSheet.rootFolderUrl,
+      managed_clients_folder_id: workspaceSheet.clientsFolderId,
+      managed_clients_folder_url: workspaceSheet.clientsFolderUrl,
+      managed_pt_library_sheet_id: workspaceSheet.ptLibrarySheetId,
+      managed_pt_library_sheet_url: workspaceSheet.ptLibrarySheetUrl,
+      managed_nutrition_library_sheet_id: workspaceSheet.nutritionLibrarySheetId,
+      managed_nutrition_library_sheet_url: workspaceSheet.nutritionLibrarySheetUrl,
       managed_workspace_sheet_modules: currentModules,
       managed_workspace_sheet_provisioned_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -79,8 +69,17 @@ export async function POST() {
 
     return NextResponse.json({
       ok: true,
+      already_provisioned: !workspaceSheet.createdAny,
       managed_workspace_sheet_id: workspaceSheet.sheetId,
       managed_workspace_sheet_url: workspaceSheet.sheetUrl,
+      managed_workspace_root_folder_id: workspaceSheet.rootFolderId,
+      managed_workspace_root_folder_url: workspaceSheet.rootFolderUrl,
+      managed_clients_folder_id: workspaceSheet.clientsFolderId,
+      managed_clients_folder_url: workspaceSheet.clientsFolderUrl,
+      managed_pt_library_sheet_id: workspaceSheet.ptLibrarySheetId,
+      managed_pt_library_sheet_url: workspaceSheet.ptLibrarySheetUrl,
+      managed_nutrition_library_sheet_id: workspaceSheet.nutritionLibrarySheetId,
+      managed_nutrition_library_sheet_url: workspaceSheet.nutritionLibrarySheetUrl,
       active_modules: currentModules,
     })
   } catch (error) {

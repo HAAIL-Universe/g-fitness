@@ -59,8 +59,10 @@ Multi-coach architecture is now part of the current product. The old single-admi
 
 - Each coach connects their own Google account
 - Google connection and Chameleon-managed sheet provisioning are distinct settings steps
-- Once Google is connected, settings should prompt the coach to create Chameleon-managed starter sheets for the current workspace module set
-- Each client gets one Google Sheet created from the platform template
+- Once Google is connected, settings should prompt the coach to create a coach-owned Drive workspace with a control workbook, coach-private library workbook(s) where supported, and a `Clients` folder
+- The workspace/control workbook is the coach control plane, not the place all live client rows are stored
+- Each client gets a dedicated folder and Google workbook created inside the coach's `Clients` folder
+- Client workbook sharing is scoped to that client's workbook only after invite acceptance establishes a concrete client email identity
 - Meal plans are read from the client Sheet
 - Progress entries are appended back to the client Sheet
 
@@ -145,7 +147,8 @@ Client opens invite link and completes onboarding
         ↓
 On completion:
   - Supabase client account is created
-  - Google Sheet is created in the coach's Drive
+  - a client folder and workbook are created inside the coach-owned Chameleon Drive workspace
+  - the client workbook is shared to that invited client email as an editor when the Google step succeeds
   - Profile tab is pre-filled with onboarding data
         ↓
 Client logs in to a branded portal

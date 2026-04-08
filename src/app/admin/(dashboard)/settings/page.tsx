@@ -17,6 +17,11 @@ export default function SettingsPage() {
   const [connected, setConnected] = useState<boolean | null>(null)
   const [sheetsProvisioned, setSheetsProvisioned] = useState(false)
   const [managedWorkspaceSheetUrl, setManagedWorkspaceSheetUrl] = useState("")
+  const [managedWorkspaceRootFolderUrl, setManagedWorkspaceRootFolderUrl] = useState("")
+  const [workspaceStatus, setWorkspaceStatus] = useState<
+    "healthy" | "missing" | "not_provisioned" | "disconnected"
+  >("disconnected")
+  const [missingArtifacts, setMissingArtifacts] = useState<string[]>([])
   const [disconnecting, setDisconnecting] = useState(false)
   const [provisioning, setProvisioning] = useState(false)
   const [connectionMessage, setConnectionMessage] = useState("")
@@ -92,11 +97,17 @@ export default function SettingsPage() {
         setConnected(data.connected)
         setSheetsProvisioned(Boolean(data.sheets_provisioned))
         setManagedWorkspaceSheetUrl(data.managed_workspace_sheet_url ?? "")
+        setManagedWorkspaceRootFolderUrl(data.managed_workspace_root_folder_url ?? "")
+        setWorkspaceStatus(data.workspace_status ?? "disconnected")
+        setMissingArtifacts(Array.isArray(data.missing_artifacts) ? data.missing_artifacts : [])
       })
       .catch(() => {
         setConnected(false)
         setSheetsProvisioned(false)
         setManagedWorkspaceSheetUrl("")
+        setManagedWorkspaceRootFolderUrl("")
+        setWorkspaceStatus("disconnected")
+        setMissingArtifacts([])
       })
   }
 
@@ -167,6 +178,11 @@ export default function SettingsPage() {
     try {
       await fetch("/api/google/disconnect", { method: "POST" })
       setConnected(false)
+      setSheetsProvisioned(false)
+      setWorkspaceStatus("disconnected")
+      setMissingArtifacts([])
+      setManagedWorkspaceSheetUrl("")
+      setManagedWorkspaceRootFolderUrl("")
     } catch {
       // ignore
     } finally {
@@ -190,10 +206,13 @@ export default function SettingsPage() {
 
       setSheetsProvisioned(true)
       setManagedWorkspaceSheetUrl(data.managed_workspace_sheet_url ?? "")
+      setManagedWorkspaceRootFolderUrl(data.managed_workspace_root_folder_url ?? "")
+      setWorkspaceStatus("healthy")
+      setMissingArtifacts([])
       setConnectionMessage(
         data.already_provisioned
-          ? "Chameleon Sheets are already provisioned for this workspace."
-          : "Chameleon Sheets created successfully in your Google Drive."
+          ? "The coach-owned Drive workspace is already provisioned."
+          : "The coach-owned Drive workspace and control workbook were created in your Google Drive."
       )
     } catch {
       setConnectionError("Failed to create Chameleon Sheets.")
@@ -430,14 +449,16 @@ export default function SettingsPage() {
         </p>
         {connected && !sheetsProvisioned && (
           <p className="text-sm text-gf-muted mb-4">
-            Google is connected. Create Chameleon Sheets so your workspace has the
-            structured Google Sheets setup the app can use.
+            {workspaceStatus === "missing"
+              ? "Google is connected, but part of the managed Drive workspace is missing. Regenerate it so Chameleon can restore the coach-owned folder structure."
+              : "Google is connected. Create the coach-owned Drive workspace so Chameleon can keep control files, coach libraries, and client workbooks separate."}
           </p>
         )}
         {connected && sheetsProvisioned && (
           <p className="text-sm text-gf-muted mb-4">
-            Your Chameleon-managed starter sheets are provisioned and ready in
-            your Google Drive.
+            Your coach-owned Drive workspace is provisioned. The control workbook stays private,
+            coach libraries stay private, and client workbooks are created inside the dedicated
+            Clients folder.
           </p>
         )}
         {!connected && (
@@ -449,6 +470,11 @@ export default function SettingsPage() {
         {connectionError && (
           <div className="mb-4 rounded-xl border border-yellow-500/30 bg-yellow-500/5 p-3 text-sm text-yellow-300">
             {connectionError}
+          </div>
+        )}
+        {connected && workspaceStatus === "missing" && missingArtifacts.length > 0 && (
+          <div className="mb-4 rounded-xl border border-yellow-500/30 bg-yellow-500/5 p-3 text-sm text-yellow-300">
+            Missing Drive artifacts detected: {missingArtifacts.join(", ")}.
           </div>
         )}
         {connectionMessage && (
@@ -466,7 +492,11 @@ export default function SettingsPage() {
                 <CheckCircle size={16} className="text-green-400" />
                 <Badge variant="success">Connected</Badge>
                 <Badge variant={sheetsProvisioned ? "success" : "warning"}>
-                  {sheetsProvisioned ? "Chameleon Sheets ready" : "Sheets not provisioned"}
+                  {sheetsProvisioned
+                    ? "Chameleon Sheets ready"
+                    : workspaceStatus === "missing"
+                    ? "Workspace missing"
+                    : "Sheets not provisioned"}
                 </Badge>
               </>
             ) : (
@@ -490,18 +520,33 @@ export default function SettingsPage() {
             )}
             {connected ? (
               sheetsProvisioned ? (
-                managedWorkspaceSheetUrl ? (
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => window.open(managedWorkspaceSheetUrl, "_blank", "noopener,noreferrer")}
-                  >
-                    Open Chameleon Sheets
-                  </Button>
-                ) : null
+                <div className="flex items-center gap-2">
+                  {managedWorkspaceRootFolderUrl ? (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => window.open(managedWorkspaceRootFolderUrl, "_blank", "noopener,noreferrer")}
+                    >
+                      Open Workspace Folder
+                    </Button>
+                  ) : null}
+                  {managedWorkspaceSheetUrl ? (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => window.open(managedWorkspaceSheetUrl, "_blank", "noopener,noreferrer")}
+                    >
+                      Open Control Workbook
+                    </Button>
+                  ) : null}
+                </div>
               ) : (
                 <Button size="sm" onClick={handleCreateChameleonSheets} disabled={provisioning}>
-                  {provisioning ? "Creating..." : "Create Chameleon Sheets"}
+                  {provisioning
+                    ? "Creating..."
+                    : workspaceStatus === "missing"
+                    ? "Regenerate Chameleon Sheets"
+                    : "Create Chameleon Sheets"}
                 </Button>
               )
             ) : (
