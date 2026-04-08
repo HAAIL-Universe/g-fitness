@@ -5,6 +5,8 @@ out/
 .env*.local
 *.tsbuildinfo
 next-env.d.ts
+.npm-cache/
+supabase/.temp/
 
 .vercel
 .env*.local
