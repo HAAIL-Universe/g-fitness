@@ -44,6 +44,7 @@ create table appointments (
     check (status in ('pending', 'confirmed', 'declined', 'cancelled')),
   requested_note text,
   confirmed_at timestamptz,
+  duration_minutes integer not null default 60,
   coach_note text,
   google_calendar_event_id text,
   google_calendar_event_link text,
@@ -55,6 +56,8 @@ create table appointment_slots (
   id uuid primary key default gen_random_uuid(),
   coach_id uuid not null references auth.users(id) on delete cascade,
   starts_at timestamptz not null,
+  duration_minutes integer not null default 60,
+  is_visible boolean not null default false,
   appointment_id uuid unique references appointments(id) on delete set null,
   created_at timestamptz default now(),
   updated_at timestamptz default now()

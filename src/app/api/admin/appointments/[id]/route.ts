@@ -65,6 +65,7 @@ export async function PATCH(
         clientName: existingAppointment.clients.name || "Client",
         clientEmail: existingAppointment.clients.email,
         confirmedAt: confirmed_at,
+        durationMinutes: existingAppointment.duration_minutes ?? 60,
         coachNote: coach_note ?? null,
         requestedNote: existingAppointment.requested_note ?? null,
       })

@@ -1,15 +1,18 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+
+type BookingMode = "coach_only" | "client_request_visible_slots"
 
 type Appointment = {
   id: string
   status: "pending" | "confirmed" | "declined" | "cancelled"
   requested_note: string | null
   confirmed_at: string | null
+  duration_minutes: number
   coach_note: string | null
   created_at: string
   clients: { id: string; name: string | null; email: string } | null
@@ -18,6 +21,8 @@ type Appointment = {
 type AppointmentSlot = {
   id: string
   starts_at: string
+  duration_minutes: number
+  is_visible: boolean
 }
 
 type ClientOption = {
@@ -27,6 +32,16 @@ type ClientOption = {
 }
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+const WEEKDAY_OPTIONS = [
+  { value: 1, label: "Mon" },
+  { value: 2, label: "Tue" },
+  { value: 3, label: "Wed" },
+  { value: 4, label: "Thu" },
+  { value: 5, label: "Fri" },
+  { value: 6, label: "Sat" },
+  { value: 0, label: "Sun" },
+]
+const DURATION_OPTIONS = [30, 45, 60, 75, 90]
 
 function statusBadge(status: Appointment["status"]) {
   switch (status) {
@@ -53,11 +68,12 @@ function formatCalendarTime(appointment: Appointment) {
     return appointment.status === "pending" ? "Request" : "Update"
   }
 
-  const time = new Date(appointment.confirmed_at).toLocaleTimeString("en-GB", {
-    hour: "2-digit",
-    minute: "2-digit",
-  })
-  return appointment.status === "confirmed" ? time : `${time} • ${appointment.status}`
+  const start = new Date(appointment.confirmed_at)
+  const end = new Date(start.getTime() + appointment.duration_minutes * 60000)
+  const startText = start.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })
+  const endText = end.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })
+  const range = `${startText} - ${endText}`
+  return appointment.status === "confirmed" ? range : `${range} • ${appointment.status}`
 }
 
 function eventClasses(status: Appointment["status"]) {
@@ -84,6 +100,54 @@ function formatDateTime(value: string) {
     dateStyle: "medium",
     timeStyle: "short",
   })
+}
+
+function formatSlotRange(startsAt: string, durationMinutes: number) {
+  const start = new Date(startsAt)
+  const end = new Date(start.getTime() + durationMinutes * 60000)
+  return `${formatDateTime(startsAt)} - ${end.toLocaleTimeString("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+  })}`
+}
+
+function combineDateAndTime(dateValue: string, timeValue: string) {
+  const [year, month, day] = dateValue.split("-").map(Number)
+  const [hours, minutes] = timeValue.split(":").map(Number)
+  return new Date(year, month - 1, day, hours, minutes, 0, 0).toISOString()
+}
+
+function Modal({
+  open,
+  title,
+  description,
+  onClose,
+  children,
+}: {
+  open: boolean
+  title: string
+  description?: string
+  onClose: () => void
+  children: React.ReactNode
+}) {
+  if (!open) return null
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+      <div className="w-full max-w-3xl rounded-2xl border border-gf-border bg-gf-card p-6 shadow-2xl">
+        <div className="mb-6 flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-semibold">{title}</h2>
+            {description ? <p className="mt-1 text-sm text-gf-muted">{description}</p> : null}
+          </div>
+          <button type="button" onClick={onClose} className="text-sm text-gf-muted hover:text-white">
+            Close
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>
+  )
 }
 
 function ConfirmForm({
@@ -178,25 +242,46 @@ export default function AdminAppointmentsPage() {
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [slots, setSlots] = useState<AppointmentSlot[]>([])
   const [clients, setClients] = useState<ClientOption[]>([])
+  const [bookingMode, setBookingMode] = useState<BookingMode>("coach_only")
   const [confirming, setConfirming] = useState<string | null>(null)
   const [declining, setDeclining] = useState<string | null>(null)
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null)
   const [slotClientId, setSlotClientId] = useState("")
   const [slotNote, setSlotNote] = useState("")
-  const [newSlotAt, setNewSlotAt] = useState("")
-  const [creatingSlot, setCreatingSlot] = useState(false)
   const [calendarMonth, setCalendarMonth] = useState(() => {
     const today = new Date()
     return new Date(today.getFullYear(), today.getMonth(), 1)
   })
+  const [selectedDayKey, setSelectedDayKey] = useState(() => formatDayKey(new Date()))
+  const [bookingOpen, setBookingOpen] = useState(false)
+  const [availabilityOpen, setAvailabilityOpen] = useState(false)
+  const [dayDetailOpen, setDayDetailOpen] = useState(false)
+  const [bookingClientId, setBookingClientId] = useState("")
+  const [bookingDate, setBookingDate] = useState(() => formatDayKey(new Date()))
+  const [bookingTime, setBookingTime] = useState("09:00")
+  const [bookingDuration, setBookingDuration] = useState("60")
+  const [bookingNote, setBookingNote] = useState("")
+  const [bookingSubmitting, setBookingSubmitting] = useState(false)
+  const [availabilityDays, setAvailabilityDays] = useState<number[]>([new Date().getDay()])
+  const [availabilityStartDate, setAvailabilityStartDate] = useState(() => formatDayKey(new Date()))
+  const [availabilityEndDate, setAvailabilityEndDate] = useState("")
+  const [availabilityStartTime, setAvailabilityStartTime] = useState("09:00")
+  const [availabilityEndTime, setAvailabilityEndTime] = useState("17:00")
+  const [availabilitySlotLength, setAvailabilitySlotLength] = useState("60")
+  const [availabilityVisible, setAvailabilityVisible] = useState(false)
+  const [availabilitySubmitting, setAvailabilitySubmitting] = useState(false)
 
   async function load() {
-    const [appointmentsData, slotsData] = await Promise.all([
+    const [appointmentsData, slotsData, profileData] = await Promise.all([
       fetch("/api/admin/appointments").then((r) => r.json()),
       fetch("/api/admin/appointment-slots").then((r) => r.json()),
+      fetch("/api/admin/profile").then((r) => r.json()),
     ])
     setAppointments(appointmentsData.appointments ?? [])
     setSlots(slotsData.slots ?? [])
+    const mode = profileData.appointment_booking_mode ?? "coach_only"
+    setBookingMode(mode)
+    setAvailabilityVisible(mode === "client_request_visible_slots")
     setConfirming(null)
     setDeclining(null)
     setSelectedSlotId(null)
@@ -218,20 +303,6 @@ export default function AdminAppointmentsPage() {
         )
       )
   }, [])
-
-  async function createSlot(e: React.FormEvent) {
-    e.preventDefault()
-    if (!newSlotAt) return
-    setCreatingSlot(true)
-    await fetch("/api/admin/appointment-slots", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ starts_at: newSlotAt }),
-    })
-    setNewSlotAt("")
-    setCreatingSlot(false)
-    load()
-  }
 
   async function removeSlot(id: string) {
     await fetch(`/api/admin/appointment-slots/${id}`, { method: "DELETE" })
@@ -270,72 +341,128 @@ export default function AdminAppointmentsPage() {
     return date
   })
   const todayKey = formatDayKey(new Date())
-  const selectedDate = newSlotAt ? new Date(newSlotAt) : new Date()
-  const selectedDayKey = formatDayKey(selectedDate)
+  const selectedDate = new Date(`${selectedDayKey}T00:00:00`)
   const slotMap = slots.reduce<Record<string, AppointmentSlot[]>>((acc, slot) => {
     const key = formatDayKey(new Date(slot.starts_at))
     if (!acc[key]) acc[key] = []
     acc[key].push(slot)
+    acc[key].sort((a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime())
     return acc
   }, {})
   const selectedAppointments = appointmentMap[selectedDayKey] ?? []
   const selectedSlots = slotMap[selectedDayKey] ?? []
+  const existingSlotStarts = useMemo(() => new Set(slots.map((slot) => slot.starts_at)), [slots])
+
+  function openBookingForDay(dayKey: string) {
+    setSelectedDayKey(dayKey)
+    setBookingDate(dayKey)
+    setBookingOpen(true)
+  }
+
+  function openAvailabilityForDay(dayKey: string) {
+    setSelectedDayKey(dayKey)
+    setAvailabilityStartDate(dayKey)
+    setAvailabilityEndDate("")
+    setAvailabilityDays([new Date(`${dayKey}T00:00:00`).getDay()])
+    setAvailabilityOpen(true)
+  }
+
+  async function submitBooking(e: React.FormEvent) {
+    e.preventDefault()
+    if (!bookingClientId || !bookingDate || !bookingTime) return
+
+    setBookingSubmitting(true)
+    await fetch("/api/admin/appointments", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        client_id: bookingClientId,
+        starts_at: combineDateAndTime(bookingDate, bookingTime),
+        duration_minutes: Number(bookingDuration),
+        note: bookingNote,
+        direct_confirm: bookingMode === "coach_only",
+      }),
+    })
+    setBookingSubmitting(false)
+    setBookingOpen(false)
+    setDayDetailOpen(true)
+    load()
+  }
+
+  async function submitAvailability(e: React.FormEvent) {
+    e.preventDefault()
+    if (!availabilityStartDate || availabilityDays.length === 0) return
+
+    const slotLength = Number(availabilitySlotLength)
+    const rangeStart = new Date(`${availabilityStartDate}T00:00:00`)
+    const rangeEnd = new Date(`${availabilityEndDate || availabilityStartDate}T00:00:00`)
+
+    if (Number.isNaN(slotLength) || slotLength <= 0 || rangeStart > rangeEnd) return
+
+    const payload: Array<{ starts_at: string; duration_minutes: number; is_visible: boolean }> = []
+    const seen = new Set<string>()
+
+    for (const current = new Date(rangeStart); current <= rangeEnd; current.setDate(current.getDate() + 1)) {
+      if (!availabilityDays.includes(current.getDay())) continue
+
+      const [startHour, startMinute] = availabilityStartTime.split(":").map(Number)
+      const [endHour, endMinute] = availabilityEndTime.split(":").map(Number)
+      const windowStart = new Date(current.getFullYear(), current.getMonth(), current.getDate(), startHour, startMinute)
+      const windowEnd = new Date(current.getFullYear(), current.getMonth(), current.getDate(), endHour, endMinute)
+
+      for (
+        let slotStart = new Date(windowStart);
+        slotStart.getTime() + slotLength * 60000 <= windowEnd.getTime();
+        slotStart = new Date(slotStart.getTime() + slotLength * 60000)
+      ) {
+        const startsAt = slotStart.toISOString()
+        if (existingSlotStarts.has(startsAt) || seen.has(startsAt)) continue
+        seen.add(startsAt)
+        payload.push({
+          starts_at: startsAt,
+          duration_minutes: slotLength,
+          is_visible: availabilityVisible,
+        })
+      }
+    }
+
+    if (payload.length === 0) return
+
+    setAvailabilitySubmitting(true)
+    await fetch("/api/admin/appointment-slots", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ slots: payload }),
+    })
+    setAvailabilitySubmitting(false)
+    setAvailabilityOpen(false)
+    setDayDetailOpen(true)
+    load()
+  }
 
   return (
-    <div className="p-8 max-w-6xl">
-      <h1 className="text-2xl font-bold mb-6">Appointments</h1>
-
-      <section className="mb-8">
-        <Card>
-          <h2 className="text-lg font-semibold mb-3">Publish Available Slots</h2>
-          <p className="text-sm text-gf-muted mb-4">
-            Add one-off times that clients can request when visible-slot mode is enabled.
+    <div className="max-w-6xl p-8">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="mb-2 text-2xl font-bold">Appointments</h1>
+          <p className="text-sm text-gf-muted">
+            Move quickly between coach-created bookings, client requests, and open availability without exposing slot-publishing mechanics in the main view.
           </p>
-          <form onSubmit={createSlot} className="flex flex-col sm:flex-row gap-3 mb-4">
-            <input
-              type="datetime-local"
-              value={newSlotAt}
-              onChange={(e) => setNewSlotAt(e.target.value)}
-              className="w-full bg-gf-surface border border-gf-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-gf-pink"
-            />
-            <Button type="submit" disabled={creatingSlot || !newSlotAt}>
-              {creatingSlot ? "Publishing..." : "Publish Slot"}
-            </Button>
-          </form>
-          {slots.length > 0 ? (
-            <div className="space-y-2">
-              {slots.slice(0, 8).map((slot) => (
-                <div
-                  key={slot.id}
-                  className="flex items-center justify-between gap-3 rounded-lg border border-gf-border px-3 py-2"
-                >
-                  <p className="text-sm">
-                    {new Date(slot.starts_at).toLocaleString("en-GB", {
-                      dateStyle: "medium",
-                      timeStyle: "short",
-                    })}
-                  </p>
-                  <button
-                    onClick={() => removeSlot(slot.id)}
-                    className="text-sm text-gf-muted hover:text-white"
-                  >
-                    Remove
-                  </button>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-gf-muted">No published slots yet.</p>
-          )}
-        </Card>
-      </section>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={() => openBookingForDay(selectedDayKey)}>+ Booking</Button>
+          <Button variant="secondary" onClick={() => openAvailabilityForDay(selectedDayKey)}>
+            Availability
+          </Button>
+        </div>
+      </div>
 
       <section className="mb-8">
         <div className="flex items-center justify-between gap-3 mb-3">
           <div>
             <h2 className="text-lg font-semibold">Calendar</h2>
             <p className="text-sm text-gf-muted">
-              Confirmed sessions use their scheduled time. Pending requests use the client's preferred time when one has been submitted.
+              Click a day to review booked appointments, open slots, and quick actions. Confirmed sessions still sync on confirm.
             </p>
           </div>
           <div className="flex gap-2">
@@ -376,8 +503,8 @@ export default function AdminAppointmentsPage() {
               <span className="rounded-full border border-yellow-500/30 bg-yellow-500/10 px-2 py-1 text-yellow-100">
                 Pending
               </span>
-              <span className="rounded-full border border-gf-border bg-gf-surface px-2 py-1 text-gf-muted">
-                Declined / Cancelled
+              <span className="rounded-full border border-blue-500/20 bg-blue-500/10 px-2 py-1 text-blue-200">
+                Open slot
               </span>
             </div>
           </div>
@@ -403,14 +530,12 @@ export default function AdminAppointmentsPage() {
                 <button
                   key={dayKey}
                   type="button"
-                  onClick={() => setNewSlotAt((current) => {
-                    const value = current ? new Date(current) : new Date()
-                    const next = new Date(date)
-                    next.setHours(value.getHours() || 9, value.getMinutes(), 0, 0)
-                    return toLocalDateTimeValue(next.toISOString())
-                  })}
+                  onClick={() => {
+                    setSelectedDayKey(dayKey)
+                    setDayDetailOpen(true)
+                  }}
                   className={[
-                    "min-h-32 rounded-xl border p-2 text-left",
+                    "min-h-32 rounded-xl border p-2 text-left transition",
                     isCurrentMonth ? "border-gf-border bg-gf-card" : "border-gf-border/50 bg-gf-surface/40 text-gf-muted",
                     isToday ? "ring-1 ring-gf-pink" : "",
                     isSelected ? "shadow-[0_0_0_1px_rgba(255,45,138,0.5)_inset]" : "",
@@ -449,117 +574,6 @@ export default function AdminAppointmentsPage() {
                 </button>
               )
             })}
-          </div>
-        </Card>
-      </section>
-
-      <section className="mb-8">
-        <Card>
-          <h2 className="text-lg font-semibold mb-2">
-            {selectedDate.toLocaleDateString("en-GB", { dateStyle: "full" })}
-          </h2>
-          <p className="text-sm text-gf-muted mb-4">
-            Review the selected day, publish a slot, or assign an open slot to a client.
-          </p>
-
-          <form onSubmit={createSlot} className="flex flex-col sm:flex-row gap-3 mb-6">
-            <input
-              type="datetime-local"
-              value={newSlotAt}
-              onChange={(e) => setNewSlotAt(e.target.value)}
-              className="w-full bg-gf-surface border border-gf-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-gf-pink"
-            />
-            <Button type="submit" disabled={creatingSlot || !newSlotAt}>
-              {creatingSlot ? "Publishing..." : "Publish Slot"}
-            </Button>
-          </form>
-
-          <div className="mb-6">
-            <h3 className="font-medium mb-2">Appointments</h3>
-            {selectedAppointments.length > 0 ? (
-              <div className="space-y-2">
-                {selectedAppointments.map((appointment) => (
-                  <div
-                    key={`selected-${appointment.id}`}
-                    className="flex items-center justify-between gap-3 rounded-lg border border-gf-border px-3 py-2"
-                  >
-                    <div>
-                      <p className="text-sm font-medium">{appointment.clients?.name ?? "Unknown client"}</p>
-                      <p className="text-xs text-gf-muted">
-                        {appointment.confirmed_at ? formatDateTime(appointment.confirmed_at) : "Request"}
-                      </p>
-                    </div>
-                    {statusBadge(appointment.status)}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-gf-muted">No appointments for this day.</p>
-            )}
-          </div>
-
-          <div>
-            <h3 className="font-medium mb-2">Open Slots</h3>
-            {selectedSlots.length > 0 ? (
-              <div className="space-y-3">
-                {selectedSlots.map((slot) => (
-                  <div key={`slot-${slot.id}`} className="rounded-lg border border-gf-border px-3 py-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="text-sm font-medium">{formatDateTime(slot.starts_at)}</p>
-                      <div className="flex items-center gap-3">
-                        <button
-                          onClick={() => removeSlot(slot.id)}
-                          className="text-sm text-gf-muted hover:text-white"
-                        >
-                          Remove
-                        </button>
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => setSelectedSlotId(selectedSlotId === slot.id ? null : slot.id)}
-                        >
-                          {selectedSlotId === slot.id ? "Hide" : "Assign to Client"}
-                        </Button>
-                      </div>
-                    </div>
-
-                    {selectedSlotId === slot.id && (
-                      <div className="mt-3 space-y-3 border-t border-gf-border pt-3">
-                        <select
-                          value={slotClientId}
-                          onChange={(e) => setSlotClientId(e.target.value)}
-                          className="w-full bg-gf-surface border border-gf-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-gf-pink"
-                        >
-                          <option value="">Select client...</option>
-                          {clients.map((client) => (
-                            <option key={client.id} value={client.id}>
-                              {client.name} ({client.email})
-                            </option>
-                          ))}
-                        </select>
-                        <input
-                          type="text"
-                          value={slotNote}
-                          onChange={(e) => setSlotNote(e.target.value)}
-                          placeholder="Optional note for this proposal"
-                          className="w-full bg-gf-surface border border-gf-border rounded-lg px-3 py-2 text-sm text-white placeholder-gf-muted focus:outline-none focus:border-gf-pink"
-                        />
-                        <Button
-                          type="button"
-                          disabled={!slotClientId}
-                          onClick={() => assignSlot(slot.id)}
-                        >
-                          Create Pending Appointment
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-gf-muted">No open slots for this day.</p>
-            )}
           </div>
         </Card>
       </section>
@@ -624,9 +638,7 @@ export default function AdminAppointmentsPage() {
                   <div className="space-y-1">
                     <p className="font-medium">{a.clients?.name ?? "Unknown client"}</p>
                     {a.confirmed_at && (
-                      <p className="text-sm">
-                        {new Date(a.confirmed_at).toLocaleString("en-GB", { dateStyle: "full", timeStyle: "short" })}
-                      </p>
+                      <p className="text-sm">{formatSlotRange(a.confirmed_at, a.duration_minutes)}</p>
                     )}
                     {a.coach_note && (
                       <p className="text-sm text-gf-muted">"{a.coach_note}"</p>
@@ -662,6 +674,337 @@ export default function AdminAppointmentsPage() {
       {appointments.length === 0 && (
         <p className="text-gf-muted text-sm">No appointments yet.</p>
       )}
+
+      <Modal
+        open={bookingOpen}
+        title="+ Booking"
+        description={
+          bookingMode === "coach_only"
+            ? "Create a confirmed booking directly for the selected client."
+            : "Send a booking request using the existing request and confirm flow."
+        }
+        onClose={() => setBookingOpen(false)}
+      >
+        <form onSubmit={submitBooking} className="grid gap-4 md:grid-cols-2">
+          <label className="space-y-2 md:col-span-2">
+            <span className="text-sm text-gf-muted">Client</span>
+            <select
+              value={bookingClientId}
+              onChange={(e) => setBookingClientId(e.target.value)}
+              className="w-full rounded-lg border border-gf-border bg-gf-surface px-3 py-2 text-sm text-white focus:border-gf-pink focus:outline-none"
+            >
+              <option value="">Select client...</option>
+              {clients.map((client) => (
+                <option key={client.id} value={client.id}>
+                  {client.name} ({client.email})
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="space-y-2">
+            <span className="text-sm text-gf-muted">Date</span>
+            <input
+              type="date"
+              value={bookingDate}
+              onChange={(e) => setBookingDate(e.target.value)}
+              className="w-full rounded-lg border border-gf-border bg-gf-surface px-3 py-2 text-sm text-white focus:border-gf-pink focus:outline-none"
+            />
+          </label>
+          <label className="space-y-2">
+            <span className="text-sm text-gf-muted">Start time</span>
+            <input
+              type="time"
+              value={bookingTime}
+              onChange={(e) => setBookingTime(e.target.value)}
+              className="w-full rounded-lg border border-gf-border bg-gf-surface px-3 py-2 text-sm text-white focus:border-gf-pink focus:outline-none"
+            />
+          </label>
+          <label className="space-y-2">
+            <span className="text-sm text-gf-muted">Duration</span>
+            <select
+              value={bookingDuration}
+              onChange={(e) => setBookingDuration(e.target.value)}
+              className="w-full rounded-lg border border-gf-border bg-gf-surface px-3 py-2 text-sm text-white focus:border-gf-pink focus:outline-none"
+            >
+              {DURATION_OPTIONS.map((minutes) => (
+                <option key={minutes} value={minutes}>
+                  {minutes} minutes
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="space-y-2 md:col-span-2">
+            <span className="text-sm text-gf-muted">Notes</span>
+            <textarea
+              value={bookingNote}
+              onChange={(e) => setBookingNote(e.target.value)}
+              placeholder="Optional note"
+              rows={3}
+              className="w-full resize-none rounded-lg border border-gf-border bg-gf-surface px-3 py-2 text-sm text-white placeholder-gf-muted focus:border-gf-pink focus:outline-none"
+            />
+          </label>
+          <div className="flex justify-end gap-2 md:col-span-2">
+            <Button type="button" variant="ghost" onClick={() => setBookingOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={bookingSubmitting || !bookingClientId || !bookingDate || !bookingTime}>
+              {bookingSubmitting
+                ? bookingMode === "coach_only"
+                  ? "Creating..."
+                  : "Sending..."
+                : bookingMode === "coach_only"
+                  ? "Create Booking"
+                  : "Send Booking Request"}
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal
+        open={availabilityOpen}
+        title="Availability"
+        description="Create one-off slots across selected weekdays and dates. These slots can stay internal or be exposed to clients."
+        onClose={() => setAvailabilityOpen(false)}
+      >
+        <form onSubmit={submitAvailability} className="grid gap-4 md:grid-cols-2">
+          <div className="space-y-2 md:col-span-2">
+            <span className="text-sm text-gf-muted">Days of week</span>
+            <div className="flex flex-wrap gap-2">
+              {WEEKDAY_OPTIONS.map((day) => {
+                const active = availabilityDays.includes(day.value)
+                return (
+                  <button
+                    key={day.label}
+                    type="button"
+                    onClick={() =>
+                      setAvailabilityDays((current) =>
+                        current.includes(day.value)
+                          ? current.filter((value) => value !== day.value)
+                          : [...current, day.value]
+                      )
+                    }
+                    className={[
+                      "rounded-full border px-3 py-1.5 text-sm",
+                      active
+                        ? "border-gf-pink bg-gf-pink/15 text-white"
+                        : "border-gf-border bg-gf-surface text-gf-muted hover:text-white",
+                    ].join(" ")}
+                  >
+                    {day.label}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+          <label className="space-y-2">
+            <span className="text-sm text-gf-muted">Start time</span>
+            <input
+              type="time"
+              value={availabilityStartTime}
+              onChange={(e) => setAvailabilityStartTime(e.target.value)}
+              className="w-full rounded-lg border border-gf-border bg-gf-surface px-3 py-2 text-sm text-white focus:border-gf-pink focus:outline-none"
+            />
+          </label>
+          <label className="space-y-2">
+            <span className="text-sm text-gf-muted">End time</span>
+            <input
+              type="time"
+              value={availabilityEndTime}
+              onChange={(e) => setAvailabilityEndTime(e.target.value)}
+              className="w-full rounded-lg border border-gf-border bg-gf-surface px-3 py-2 text-sm text-white focus:border-gf-pink focus:outline-none"
+            />
+          </label>
+          <label className="space-y-2">
+            <span className="text-sm text-gf-muted">Slot length</span>
+            <select
+              value={availabilitySlotLength}
+              onChange={(e) => setAvailabilitySlotLength(e.target.value)}
+              className="w-full rounded-lg border border-gf-border bg-gf-surface px-3 py-2 text-sm text-white focus:border-gf-pink focus:outline-none"
+            >
+              {DURATION_OPTIONS.map((minutes) => (
+                <option key={minutes} value={minutes}>
+                  {minutes} minutes
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="space-y-2">
+            <span className="text-sm text-gf-muted">Expose to clients</span>
+            <select
+              value={availabilityVisible ? "yes" : "no"}
+              onChange={(e) => setAvailabilityVisible(e.target.value === "yes")}
+              className="w-full rounded-lg border border-gf-border bg-gf-surface px-3 py-2 text-sm text-white focus:border-gf-pink focus:outline-none"
+            >
+              <option value="no">Coach only</option>
+              <option value="yes">Visible to clients</option>
+            </select>
+          </label>
+          <label className="space-y-2">
+            <span className="text-sm text-gf-muted">From date</span>
+            <input
+              type="date"
+              value={availabilityStartDate}
+              onChange={(e) => setAvailabilityStartDate(e.target.value)}
+              className="w-full rounded-lg border border-gf-border bg-gf-surface px-3 py-2 text-sm text-white focus:border-gf-pink focus:outline-none"
+            />
+          </label>
+          <label className="space-y-2">
+            <span className="text-sm text-gf-muted">To date</span>
+            <input
+              type="date"
+              value={availabilityEndDate}
+              onChange={(e) => setAvailabilityEndDate(e.target.value)}
+              className="w-full rounded-lg border border-gf-border bg-gf-surface px-3 py-2 text-sm text-white focus:border-gf-pink focus:outline-none"
+            />
+          </label>
+          <div className="flex justify-end gap-2 md:col-span-2">
+            <Button type="button" variant="ghost" onClick={() => setAvailabilityOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={availabilitySubmitting || availabilityDays.length === 0}>
+              {availabilitySubmitting ? "Saving..." : "Save Availability"}
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal
+        open={dayDetailOpen}
+        title={selectedDate.toLocaleDateString("en-GB", { dateStyle: "full" })}
+        description="Booked appointments, open slots, and quick actions for the selected day."
+        onClose={() => setDayDetailOpen(false)}
+      >
+        <div className="mb-6 flex flex-wrap gap-2">
+          <Button
+            onClick={() => {
+              setDayDetailOpen(false)
+              openBookingForDay(selectedDayKey)
+            }}
+          >
+            + Booking
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setDayDetailOpen(false)
+              openAvailabilityForDay(selectedDayKey)
+            }}
+          >
+            Availability
+          </Button>
+        </div>
+        <div className="grid gap-6 lg:grid-cols-2">
+          <div>
+            <h3 className="mb-2 font-medium">Booked appointments</h3>
+            {selectedAppointments.length > 0 ? (
+              <div className="space-y-3">
+                {selectedAppointments.map((appointment) => (
+                  <div key={`selected-${appointment.id}`} className="rounded-lg border border-gf-border px-3 py-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-medium">{appointment.clients?.name ?? "Unknown client"}</p>
+                        <p className="text-xs text-gf-muted">
+                          {appointment.confirmed_at ? formatSlotRange(appointment.confirmed_at, appointment.duration_minutes) : "Request"}
+                        </p>
+                        {appointment.requested_note ? <p className="mt-1 text-xs text-gf-muted">"{appointment.requested_note}"</p> : null}
+                      </div>
+                      {statusBadge(appointment.status)}
+                    </div>
+                    {appointment.status === "pending" ? (
+                      confirming === appointment.id ? (
+                        <ConfirmForm id={appointment.id} initialConfirmedAt={appointment.confirmed_at} onDone={load} />
+                      ) : declining === appointment.id ? (
+                        <DeclineForm id={appointment.id} onDone={load} />
+                      ) : (
+                        <div className="mt-3 flex gap-2 border-t border-gf-border pt-3">
+                          <Button
+                            onClick={() => {
+                              setConfirming(appointment.id)
+                              setDeclining(null)
+                            }}
+                            className="text-sm py-1.5 px-4"
+                          >
+                            Confirm
+                          </Button>
+                          <button
+                            onClick={() => {
+                              setDeclining(appointment.id)
+                              setConfirming(null)
+                            }}
+                            className="px-4 text-sm text-gf-muted hover:text-white"
+                          >
+                            Decline
+                          </button>
+                        </div>
+                      )
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-gf-muted">No appointments for this day.</p>
+            )}
+          </div>
+          <div>
+            <h3 className="mb-2 font-medium">Open slots</h3>
+            {selectedSlots.length > 0 ? (
+              <div className="space-y-3">
+                {selectedSlots.map((slot) => (
+                  <div key={`slot-${slot.id}`} className="rounded-lg border border-gf-border px-3 py-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-medium">{formatSlotRange(slot.starts_at, slot.duration_minutes)}</p>
+                        <p className="mt-1 text-xs text-gf-muted">{slot.is_visible ? "Visible to clients" : "Coach only"}</p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <button onClick={() => removeSlot(slot.id)} className="text-sm text-gf-muted hover:text-white">
+                          Remove
+                        </button>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => setSelectedSlotId(selectedSlotId === slot.id ? null : slot.id)}
+                        >
+                          {selectedSlotId === slot.id ? "Hide" : "Assign to Client"}
+                        </Button>
+                      </div>
+                    </div>
+                    {selectedSlotId === slot.id ? (
+                      <div className="mt-3 space-y-3 border-t border-gf-border pt-3">
+                        <select
+                          value={slotClientId}
+                          onChange={(e) => setSlotClientId(e.target.value)}
+                          className="w-full rounded-lg border border-gf-border bg-gf-surface px-3 py-2 text-sm text-white focus:border-gf-pink focus:outline-none"
+                        >
+                          <option value="">Select client...</option>
+                          {clients.map((client) => (
+                            <option key={client.id} value={client.id}>
+                              {client.name} ({client.email})
+                            </option>
+                          ))}
+                        </select>
+                        <input
+                          type="text"
+                          value={slotNote}
+                          onChange={(e) => setSlotNote(e.target.value)}
+                          placeholder="Optional note for this proposal"
+                          className="w-full rounded-lg border border-gf-border bg-gf-surface px-3 py-2 text-sm text-white placeholder-gf-muted focus:border-gf-pink focus:outline-none"
+                        />
+                        <Button type="button" disabled={!slotClientId} onClick={() => assignSlot(slot.id)}>
+                          Create Pending Appointment
+                        </Button>
+                      </div>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-gf-muted">No open slots for this day.</p>
+            )}
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }

@@ -17,7 +17,7 @@ export async function PATCH(
 
   const { data: slot } = await supabase
     .from("appointment_slots")
-    .select("id, starts_at, appointment_id")
+    .select("id, starts_at, duration_minutes, appointment_id")
     .eq("id", id)
     .eq("coach_id", user.id)
     .is("appointment_id", null)
@@ -34,6 +34,7 @@ export async function PATCH(
       client_id,
       requested_note: note || "Proposed by coach",
       confirmed_at: slot.starts_at,
+      duration_minutes: slot.duration_minutes ?? 60,
       status: "pending",
     })
     .select("id")

@@ -37,12 +37,14 @@ export async function POST(request: NextRequest) {
   const admin = createAdmin()
 
   let preferredTime = requested_for || null
+  let durationMinutes = 60
   if (slot_id) {
     const { data: slot } = await admin
       .from("appointment_slots")
-      .select("id, starts_at, appointment_id")
+      .select("id, starts_at, duration_minutes, appointment_id, is_visible")
       .eq("id", slot_id)
       .eq("coach_id", client.coach_id)
+      .eq("is_visible", true)
       .is("appointment_id", null)
       .single()
 
@@ -51,6 +53,7 @@ export async function POST(request: NextRequest) {
     }
 
     preferredTime = slot.starts_at
+    durationMinutes = slot.duration_minutes ?? 60
   }
 
   const { data: appointment, error } = await supabase
@@ -60,6 +63,7 @@ export async function POST(request: NextRequest) {
       client_id: client.id,
       requested_note: note || null,
       confirmed_at: preferredTime,
+      duration_minutes: durationMinutes,
       status: "pending",
     })
     .select("id")

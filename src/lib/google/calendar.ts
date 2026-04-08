@@ -10,6 +10,7 @@ interface CreateCalendarEventParams {
   clientName: string
   clientEmail: string
   confirmedAt: string
+  durationMinutes?: number
   coachNote?: string | null
   requestedNote?: string | null
 }
@@ -19,6 +20,7 @@ export async function createAppointmentCalendarEvent({
   clientName,
   clientEmail,
   confirmedAt,
+  durationMinutes = APPOINTMENT_DURATION_MINUTES,
   coachNote,
   requestedNote,
 }: CreateCalendarEventParams) {
@@ -26,7 +28,7 @@ export async function createAppointmentCalendarEvent({
   const calendar = google.calendar({ version: "v3", auth })
 
   const start = new Date(confirmedAt)
-  const end = new Date(start.getTime() + APPOINTMENT_DURATION_MINUTES * 60 * 1000)
+  const end = new Date(start.getTime() + durationMinutes * 60 * 1000)
 
   const event = await calendar.events.insert({
     calendarId: "primary",
@@ -36,7 +38,7 @@ export async function createAppointmentCalendarEvent({
         `Booked via ${PLATFORM_NAME}.`,
         coachNote ? `Coach note: ${coachNote}` : "",
         requestedNote ? `Client request: ${requestedNote}` : "",
-        `Temporary default duration: ${APPOINTMENT_DURATION_MINUTES} minutes.`,
+        `Duration: ${durationMinutes} minutes.`,
       ]
         .filter(Boolean)
         .join("\n"),

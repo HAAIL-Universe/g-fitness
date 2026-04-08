@@ -37,9 +37,10 @@ export async function GET() {
   const now = new Date().toISOString()
   const { data: slots } = await admin
     .from("appointment_slots")
-    .select("id, starts_at")
+    .select("id, starts_at, duration_minutes, is_visible")
     .eq("coach_id", client.coach_id)
     .is("appointment_id", null)
+    .eq("is_visible", true)
     .gte("starts_at", now)
     .order("starts_at", { ascending: true })
 

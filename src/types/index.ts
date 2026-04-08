@@ -20,6 +20,7 @@ export interface Appointment {
   status: 'pending' | 'confirmed' | 'declined' | 'cancelled'
   requested_note: string | null
   confirmed_at: string | null
+  duration_minutes: number
   coach_note: string | null
   google_calendar_event_id: string | null
   google_calendar_event_link: string | null
@@ -50,6 +51,8 @@ export interface AppointmentSlot {
   id: string
   coach_id: string
   starts_at: string
+  duration_minutes: number
+  is_visible: boolean
   appointment_id: string | null
   created_at: string
   updated_at: string
