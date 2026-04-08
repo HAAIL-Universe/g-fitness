@@ -66,6 +66,13 @@ export default function LoginForm() {
           Sign in to your coaching portal
         </p>
 
+        <div className="mb-6 rounded-lg border border-gf-border bg-gf-surface p-4 text-sm">
+          <p className="text-white">Are you a coach or a client?</p>
+          <p className="mt-1 text-gf-muted">
+            Coaches create a workspace at <a href="/register/coach" className="text-gf-pink hover:underline">coach signup</a>. Clients usually join through an invite link or the client path.
+          </p>
+        </div>
+
         {(onboarded || registered) && (
           <div className="bg-green-900/20 border border-green-800 rounded-lg p-3 mb-6">
             <p className="text-sm text-green-400 text-center">
@@ -104,9 +111,9 @@ export default function LoginForm() {
         </Card>
 
         <p className="text-center text-sm text-gf-muted mt-6">
-          Don&apos;t have an account?{" "}
+          Need to get started?{" "}
           <a href="/register" className="text-gf-pink hover:underline">
-            Create an account
+            Choose your path
           </a>
         </p>
       </div>
