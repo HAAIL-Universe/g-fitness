@@ -63,8 +63,24 @@ export async function deleteClientsForCoach(
   }
 
   // Legacy single-workspace fallback before the coach_id migration exists live.
+  const legacyClientsQuery = await supabase
+    .from("clients")
+    .select("id")
+
+  if (legacyClientsQuery.error) {
+    return { data: null, error: legacyClientsQuery.error }
+  }
+
+  const legacyClientIds = (legacyClientsQuery.data ?? [])
+    .map((client: { id: string | null }) => client.id)
+    .filter((id: string | null): id is string => typeof id === "string" && id.length > 0)
+
+  if (legacyClientIds.length === 0) {
+    return { data: [], error: null }
+  }
+
   return supabase
     .from("clients")
     .delete()
-    .neq("id", "")
+    .in("id", legacyClientIds)
 }
