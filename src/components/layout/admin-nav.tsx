@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
@@ -12,7 +12,6 @@ const navItems = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/invite", label: "Invite Client", icon: UserPlus },
   { href: "/admin/appointments", label: "Appointments", icon: Calendar },
-  { href: "/admin/exercises", label: "Exercises", icon: Dumbbell },
   { href: "/admin/settings", label: "Settings", icon: Settings },
   { href: "/admin/billing", label: "Billing", icon: CreditCard },
 ]
@@ -21,6 +20,21 @@ export function AdminNav() {
   const pathname = usePathname()
   const router = useRouter()
   const [open, setOpen] = useState(false)
+  const [canAccessExercises, setCanAccessExercises] = useState(pathname === "/admin/exercises")
+
+  useEffect(() => {
+    fetch("/api/admin/profile")
+      .then((res) => res.json())
+      .then((data) => {
+        const activeModules = Array.isArray(data.resolved_active_modules)
+          ? data.resolved_active_modules
+          : []
+        setCanAccessExercises(activeModules.includes("pt_core"))
+      })
+      .catch(() => {
+        setCanAccessExercises(pathname === "/admin/exercises")
+      })
+  }, [pathname])
 
   async function handleLogout() {
     const supabase = createClient()
@@ -60,6 +74,21 @@ export function AdminNav() {
             {label}
           </Link>
         ))}
+        {canAccessExercises ? (
+          <Link
+            href="/admin/exercises"
+            onClick={() => setOpen(false)}
+            className={cn(
+              "flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm transition-colors",
+              pathname === "/admin/exercises"
+                ? "bg-gf-pink/10 text-gf-pink font-medium"
+                : "text-gf-muted hover:text-white hover:bg-gf-surface"
+            )}
+          >
+            <Dumbbell size={18} />
+            Exercises
+          </Link>
+        ) : null}
       </div>
 
       <button

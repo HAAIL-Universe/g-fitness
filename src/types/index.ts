@@ -51,6 +51,15 @@ export interface AdminSettings {
   brand_accent_color: string | null
   brand_welcome_text: string | null
   show_powered_by: boolean | null
+  coach_type_preset:
+    | 'personal_trainer'
+    | 'nutritionist'
+    | 'wellness_coach'
+    | 'sports_performance_coach'
+    | 'yoga_pilates_instructor'
+    | 'gym_studio_owner'
+    | null
+  active_modules: string[] | null
   appointment_booking_mode: 'coach_only' | 'client_request_visible_slots' | null
   created_at: string
   updated_at: string

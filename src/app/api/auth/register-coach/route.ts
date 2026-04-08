@@ -1,17 +1,23 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { createAdmin } from "@/lib/supabase/server"
 import { createStripeCustomer, createTrialSubscription } from "@/lib/stripe"
+import { normalizeCoachTypePreset, seedModulesForPreset } from "@/lib/modules"
 
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}))
-  const { name, email, password } = body
+  const { name, email, password, coach_type_preset } = body
 
-  if (!name || !email || !password) {
-    return NextResponse.json({ error: "Name, email and password are required" }, { status: 400 })
+  if (!name || !email || !password || !coach_type_preset) {
+    return NextResponse.json({ error: "Name, email, password and coach type are required" }, { status: 400 })
   }
 
   if (password.length < 6) {
     return NextResponse.json({ error: "Password must be at least 6 characters" }, { status: 400 })
+  }
+
+  const preset = normalizeCoachTypePreset(coach_type_preset)
+  if (!preset) {
+    return NextResponse.json({ error: "Invalid coach type" }, { status: 400 })
   }
 
   let supabase: ReturnType<typeof createAdmin>
@@ -68,6 +74,27 @@ export async function POST(request: NextRequest) {
     // Clean up auth user if role insert fails
     await supabase.auth.admin.deleteUser(authData.user.id)
     return NextResponse.json({ error: `Failed to assign coach role: ${roleError.message} (code: ${roleError.code})` }, { status: 500 })
+  }
+
+  const { error: settingsError } = await supabase
+    .from("admin_settings")
+    .upsert(
+      {
+        user_id: authData.user.id,
+        display_name: name,
+        coach_type_preset: preset,
+        active_modules: seedModulesForPreset(preset),
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "user_id" }
+    )
+
+  if (settingsError) {
+    await supabase.auth.admin.deleteUser(authData.user.id)
+    return NextResponse.json(
+      { error: `Failed to create coach settings: ${settingsError.message}` },
+      { status: 500 }
+    )
   }
 
   return NextResponse.json({ ok: true })

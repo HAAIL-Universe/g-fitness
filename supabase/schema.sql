@@ -16,6 +16,16 @@ create table admin_settings (
   brand_accent_color text,
   brand_welcome_text text,
   show_powered_by boolean default true,
+  coach_type_preset text
+    check (coach_type_preset in (
+      'personal_trainer',
+      'nutritionist',
+      'wellness_coach',
+      'sports_performance_coach',
+      'yoga_pilates_instructor',
+      'gym_studio_owner'
+    )),
+  active_modules text[],
   appointment_booking_mode text default 'coach_only',
   created_at timestamptz default now(),
   updated_at timestamptz default now()

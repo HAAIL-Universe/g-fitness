@@ -6,6 +6,16 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { PLATFORM_NAME } from "@/lib/platform"
+import { COACH_TYPE_PRESETS } from "@/lib/modules"
+
+const COACH_TYPE_OPTIONS = [
+  { value: "personal_trainer", label: "Personal trainer" },
+  { value: "nutritionist", label: "Nutritionist" },
+  { value: "wellness_coach", label: "Wellness coach" },
+  { value: "sports_performance_coach", label: "Sports performance coach" },
+  { value: "yoga_pilates_instructor", label: "Yoga / Pilates instructor" },
+  { value: "gym_studio_owner", label: "Gym / studio owner" },
+] as const
 
 export default function RegisterCoachPage() {
   const router = useRouter()
@@ -14,6 +24,7 @@ export default function RegisterCoachPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
+  const [coachTypePreset, setCoachTypePreset] = useState<(typeof COACH_TYPE_PRESETS)[number]>("personal_trainer")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
 
@@ -36,7 +47,7 @@ export default function RegisterCoachPage() {
       const res = await fetch("/api/auth/register-coach", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password }),
+        body: JSON.stringify({ name, email, password, coach_type_preset: coachTypePreset }),
       })
 
       const data = await res.json()
@@ -81,6 +92,26 @@ export default function RegisterCoachPage() {
               placeholder="you@example.com"
               required
             />
+            <div className="space-y-1.5">
+              <label htmlFor="coach-type-preset" className="block text-sm font-medium text-gf-muted">
+                Coach Type
+              </label>
+              <select
+                id="coach-type-preset"
+                value={coachTypePreset}
+                onChange={(e) => setCoachTypePreset(e.target.value as (typeof COACH_TYPE_PRESETS)[number])}
+                className="w-full bg-gf-surface border border-gf-border rounded-lg px-4 py-2.5 text-white transition-colors focus:outline-none focus:border-gf-pink focus:ring-1 focus:ring-gf-pink/30"
+              >
+                {COACH_TYPE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-gf-muted">
+                This sets your starting workspace preset. You can enable more modules later.
+              </p>
+            </div>
             <Input
               label="Password"
               type="password"
